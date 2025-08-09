@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Exercises</title>
 
-<!-- PWA hooks (keep these since you already added the files) -->
 <link rel="manifest" href="./manifest.json">
 <script>
 if ("serviceWorker" in navigator) {
@@ -19,12 +18,14 @@ if ("serviceWorker" in navigator) {
   .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
   h1 { margin:0 0 14px; font-size:22px; }
   .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: var(--gap); }
-  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none; box-shadow:0 10px 30px rgba(0,0,0,.35); transition:transform .08s ease; }
+  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
+          box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
   .tile:active { transform: scale(.98); }
   .emoji { font-size:42px; display:block; margin-bottom:8px; }
   .sub { opacity:.75; font-size:12px; margin-top:4px; }
+  .tiny { opacity:.6; font-size:12px; margin-top:6px; }
 
-  .card { max-width: 520px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .card { max-width: 560px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
   .back { display:inline-block; margin-bottom:14px; color:#9aa1ff; text-decoration:none; }
   .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .muted { opacity:.75; font-size:13px; }
@@ -36,6 +37,8 @@ if ("serviceWorker" in navigator) {
   input[type="text"] { width:100%; font-size:18px; padding:12px 14px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
   input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
   .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
+  .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
+  canvas { width:100%; height:180px; display:block; }
   .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
 </style>
 </head>
@@ -45,35 +48,29 @@ if ("serviceWorker" in navigator) {
 <script>
 /* ====== CONFIG: your back-friendly exercise set ====== */
 const EXERCISES = [
-  // Core (anti-movement)
   {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
   {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
   {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
   {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
   {id:"pallof",           name:"Pallof Press",         emoji:"🎯", unit:"sec"},
   {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
-
-  // Hips/Glutes
   {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
   {id:"hip-hinge",        name:"Hip-Hinge Drill",      emoji:"🪵", unit:"reps"},
   {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
   {id:"hip-abduction",    name:"Hip Abduction",        emoji:"🦵", unit:"reps"},
   {id:"ham-bridge",       name:"Hamstring Bridge",     emoji:"🧴", unit:"reps"},
-
-  // Mobility / reset
   {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
   {id:"rock-back",        name:"Quadruped Rock-Back",  emoji:"🧎", unit:"reps"},
   {id:"t-spine-extension",name:"T-Spine Extension",    emoji:"🧘", unit:"reps"},
-
-  // Upper body
   {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
   {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
 ];
 
-/* ====== APP ====== */
 const app = document.getElementById('app');
 const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
 const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const addDays = (d, n) => { const dt = new Date(d); dt.setDate(dt.getDate()+n); return dt; };
+const isoDate = (d) => new Date(d).toISOString().slice(0,10);
 
 function keysFor(id, date) {
   return {
@@ -82,22 +79,31 @@ function keysFor(id, date) {
   };
 }
 
-/* ---------- HOME ---------- */
+/* ---------- HOME (with tiny today totals) ---------- */
 function renderHome() {
   document.title = "Exercises";
+  const today = todayStr();
+
+  const tiles = EXERCISES.map(x => {
+    const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
+    const tiny = `Today: ${isNaN(count)?0:count} ${x.unit}`;
+    return `
+      <a class="tile" href="#${x.id}" aria-label="${x.name}">
+        <span class="emoji">${x.emoji}</span>
+        <div>${x.name}</div>
+        <div class="sub">${x.unit}</div>
+        <div class="tiny">${tiny}</div>
+      </a>
+    `;
+  }).join('');
+
   app.innerHTML = `
     <h1>Exercises</h1>
-    <div class="grid fade">
-      ${EXERCISES.map(x => `
-        <a class="tile" href="#${x.id}" aria-label="${x.name}">
-          <span class="emoji">${x.emoji}</span>
-          <div>${x.name}</div>
-          <div class="sub">${x.unit}</div>
-        </a>`).join('')}
-    </div>`;
+    <div class="grid fade">${tiles}</div>
+  `;
 }
 
-/* ---------- DETAIL ---------- */
+/* ---------- DETAIL (with minimal 14-day chart) ---------- */
 function renderDetail(id) {
   const ex = EXERCISES.find(e => e.id === id);
   if (!ex) { location.hash = ""; return; }
@@ -129,21 +135,26 @@ function renderDetail(id) {
 
       <label for="notes">Notes (optional)</label>
       <input id="notes" type="text" placeholder="sets × reps, comments" value="${esc(notes)}">
-
       <div class="note" id="status">Saved</div>
+
+      <div class="chart-wrap">
+        <div class="muted" style="margin:0 0 8px;">Last 14 days</div>
+        <canvas id="chart" width="600" height="200"></canvas>
+      </div>
     </div>`;
 
+  // --- wiring ---
   const $count  = document.getElementById('count');
   const $minus  = document.getElementById('minus');
   const $plus   = document.getElementById('plus');
   const $notes  = document.getElementById('notes');
   const $status = document.getElementById('status');
   const $day    = document.getElementById('day');
+  const $chart  = document.getElementById('chart');
 
   const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
 
   function storage(dateStr) { return keysFor(id, dateStr); }
-
   function loadFor(dateStr) {
     const kk = storage(dateStr);
     const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
@@ -151,11 +162,12 @@ function renderDetail(id) {
     $count.textContent = isNaN(c) ? 0 : c;
     $notes.value = n;
     showSaved();
+    drawHistory(); // update tile chart if date changed
   }
-
   function saveCount(dateStr, n) {
     localStorage.setItem(storage(dateStr).count, String(n));
     showSaved();
+    drawHistory();
   }
   function saveNotes(dateStr, v) {
     localStorage.setItem(storage(dateStr).notes, v);
@@ -178,8 +190,85 @@ function renderDetail(id) {
 
   $day.addEventListener('change', () => loadFor($day.value));
 
-  // initial load already done for today; keep Saved indicator tidy
-  showSaved();
+  // --- minimal chart (14 days, responsive, no libs) ---
+  function getHistory(days=14) {
+    const end = new Date(todayStr()); // today inclusive
+    const start = addDays(end, -(days-1));
+    const labels = [];
+    const values = [];
+    for (let i=0;i<days;i++) {
+      const d = addDays(start, i);
+      const ds = isoDate(d);
+      const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+      labels.push(ds.slice(5)); // MM-DD
+      values.push(isNaN(v)?0:v);
+    }
+    return { labels, values };
+  }
+
+  function drawHistory() {
+    const { labels, values } = getHistory(14);
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
+    $chart.width = Math.round(cssW * dpr);
+    $chart.height = Math.round(cssH * dpr);
+
+    const ctx = $chart.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,cssW,cssH);
+
+    const pad = { l: 28, r: 8, t: 8, b: 22 };
+    const w = cssW - pad.l - pad.r;
+    const h = cssH - pad.t - pad.b;
+    const maxV = Math.max(5, ...values);
+    const barGap = 6;
+    const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
+
+    // axes
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, pad.t);
+    ctx.lineTo(pad.l, pad.t + h);
+    ctx.lineTo(pad.l + w, pad.t + h);
+    ctx.stroke();
+
+    // y ticks (0, max)
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '12px -apple-system, system-ui, Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('0', pad.l - 6, pad.t + h);
+    ctx.fillText(String(maxV), pad.l - 6, pad.t);
+
+    // bars
+    const startX = pad.l;
+    ctx.fillStyle = '#6ea8fe';
+    for (let i=0;i<values.length;i++) {
+      const v = values[i];
+      const x = startX + i*(barW + barGap);
+      const bh = (v / maxV) * h;
+      const y = pad.t + h - bh;
+      // bar
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
+    }
+
+    // x labels (sparse to avoid clutter)
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const step = Math.ceil(labels.length / 5); // ~5 labels
+    for (let i=0;i<labels.length;i+=step) {
+      const x = startX + i*(barW + barGap) + barW/2;
+      ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
+    }
+  }
+
+  drawHistory();
+  addEventListener('resize', drawHistory, {passive:true});
+
+  // initial feedback
+  (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
 }
 
 /* ---------- ROUTER ---------- */
