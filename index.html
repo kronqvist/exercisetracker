@@ -17,6 +17,12 @@
   .sub { opacity:.75; font-size:12px; margin-top:4px; }
   .note { opacity:.7; font-size:13px; margin-top:14px; }
 </style>
+<link rel="manifest" href="./manifest.json">
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./service-worker.js");
+}
+</script>
 </head>
 <body>
 <div class="wrap">
