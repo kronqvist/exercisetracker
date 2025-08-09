@@ -4,35 +4,46 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Exercises</title>
-<style>
-  :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
-  body { margin:0; background:#0b0b0f; color:#fff; }
-  .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
-  h1 { margin:0 0 14px; font-size: 22px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--gap); }
-  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
-          box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
-  .tile:active { transform: scale(.98); }
-  .emoji { font-size:42px; display:block; margin-bottom:8px; }
-  .sub { opacity:.75; font-size:12px; margin-top:4px; }
-  .note { opacity:.7; font-size:13px; margin-top:14px; }
-</style>
+
+<!-- PWA hooks (keep these since you already added the files) -->
 <link rel="manifest" href="./manifest.json">
 <script>
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./service-worker.js");
 }
 </script>
+
+<style>
+  :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
+  body { margin:0; background:#0b0b0f; color:#fff; }
+  .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
+  h1 { margin:0 0 14px; font-size:22px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: var(--gap); }
+  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none; box-shadow:0 10px 30px rgba(0,0,0,.35); transition:transform .08s ease; }
+  .tile:active { transform: scale(.98); }
+  .emoji { font-size:42px; display:block; margin-bottom:8px; }
+  .sub { opacity:.75; font-size:12px; margin-top:4px; }
+
+  .card { max-width: 520px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+  .back { display:inline-block; margin-bottom:14px; color:#9aa1ff; text-decoration:none; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .muted { opacity:.75; font-size:13px; }
+  .stepper { display:flex; align-items:center; gap:12px; margin-top: 8px; }
+  .btn { border:0; border-radius:12px; padding:14px 18px; background:#1f2030; color:#fff; font-size:20px; line-height:1; transition: transform .1s ease, background .2s ease; }
+  .btn:active { transform: scale(0.97); }
+  .count { font-variant-numeric: tabular-nums; font-size:42px; min-width: 4.5ch; text-align:center; }
+  label { display:block; margin:18px 0 6px; opacity:.85; }
+  input[type="text"] { width:100%; font-size:18px; padding:12px 14px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
+  input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
+  .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
+  .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+</style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Exercises</h1>
-  <div id="grid" class="grid"></div>
-  <div class="note">Tap a tile to open <code>#id</code>. We’ll wire the detail view next.</div>
-</div>
+<div class="wrap" id="app"></div>
 
 <script>
-/* Back-friendly set for L3–S1 (units = default counter unit) */
+/* ====== CONFIG: your back-friendly exercise set ====== */
 const EXERCISES = [
   // Core (anti-movement)
   {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
@@ -59,16 +70,125 @@ const EXERCISES = [
   {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
 ];
 
-(function renderGrid(){
-  const grid = document.getElementById('grid');
-  grid.innerHTML = EXERCISES.map(x => `
-    <a class="tile" href="#${x.id}" aria-label="${x.name}">
-      <span class="emoji">${x.emoji}</span>
-      <div>${x.name}</div>
-      <div class="sub">${x.unit}</div>
-    </a>
-  `).join('');
-})();
+/* ====== APP ====== */
+const app = document.getElementById('app');
+const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
+const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function keysFor(id, date) {
+  return {
+    count: `ex:${id}:${date}:count`,
+    notes: `ex:${id}:${date}:notes`
+  };
+}
+
+/* ---------- HOME ---------- */
+function renderHome() {
+  document.title = "Exercises";
+  app.innerHTML = `
+    <h1>Exercises</h1>
+    <div class="grid fade">
+      ${EXERCISES.map(x => `
+        <a class="tile" href="#${x.id}" aria-label="${x.name}">
+          <span class="emoji">${x.emoji}</span>
+          <div>${x.name}</div>
+          <div class="sub">${x.unit}</div>
+        </a>`).join('')}
+    </div>`;
+}
+
+/* ---------- DETAIL ---------- */
+function renderDetail(id) {
+  const ex = EXERCISES.find(e => e.id === id);
+  if (!ex) { location.hash = ""; return; }
+
+  const date = todayStr();
+  const k = keysFor(id, date);
+  const count = parseInt(localStorage.getItem(k.count) || "0", 10);
+  const notes = localStorage.getItem(k.notes) || "";
+
+  document.title = `${ex.name}`;
+
+  app.innerHTML = `
+    <a class="back" href="#">← All exercises</a>
+    <div class="card fade">
+      <div class="row">
+        <h1 style="margin:0">${ex.emoji} ${ex.name}</h1>
+        <div class="muted">
+          <label for="day" style="display:block;margin:0 0 4px;">Date</label>
+          <input id="day" type="date" value="${date}">
+        </div>
+      </div>
+
+      <div class="stepper" style="margin-top:12px;">
+        <button class="btn" id="minus" aria-label="decrease">–</button>
+        <div class="count" id="count" role="status" aria-live="polite">${isNaN(count)?0:count}</div>
+        <button class="btn" id="plus" aria-label="increase">+</button>
+        <div class="muted" style="margin-left:auto">${ex.unit}</div>
+      </div>
+
+      <label for="notes">Notes (optional)</label>
+      <input id="notes" type="text" placeholder="sets × reps, comments" value="${esc(notes)}">
+
+      <div class="note" id="status">Saved</div>
+    </div>`;
+
+  const $count  = document.getElementById('count');
+  const $minus  = document.getElementById('minus');
+  const $plus   = document.getElementById('plus');
+  const $notes  = document.getElementById('notes');
+  const $status = document.getElementById('status');
+  const $day    = document.getElementById('day');
+
+  const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
+
+  function storage(dateStr) { return keysFor(id, dateStr); }
+
+  function loadFor(dateStr) {
+    const kk = storage(dateStr);
+    const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
+    const n = localStorage.getItem(kk.notes) || "";
+    $count.textContent = isNaN(c) ? 0 : c;
+    $notes.value = n;
+    showSaved();
+  }
+
+  function saveCount(dateStr, n) {
+    localStorage.setItem(storage(dateStr).count, String(n));
+    showSaved();
+  }
+  function saveNotes(dateStr, v) {
+    localStorage.setItem(storage(dateStr).notes, v);
+    showSaved();
+  }
+
+  $plus.addEventListener('click', () => {
+    const n = parseInt($count.textContent,10) + 1;
+    $count.textContent = n; saveCount($day.value, n);
+  }, {passive:true});
+
+  $minus.addEventListener('click', () => {
+    const n = Math.max(0, parseInt($count.textContent,10) - 1);
+    $count.textContent = n; saveCount($day.value, n);
+  }, {passive:true});
+
+  let t; $notes.addEventListener('input', (e) => {
+    clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
+  });
+
+  $day.addEventListener('change', () => loadFor($day.value));
+
+  // initial load already done for today; keep Saved indicator tidy
+  showSaved();
+}
+
+/* ---------- ROUTER ---------- */
+function route() {
+  const id = location.hash.replace(/^#/, '');
+  if (id) renderDetail(id); else renderHome();
+}
+addEventListener('hashchange', route, {passive:true});
+route();
 </script>
 </body>
 </html>
