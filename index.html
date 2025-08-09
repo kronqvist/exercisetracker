@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Exercises</title>
+<style>
+  :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
+  body { margin:0; background:#0b0b0f; color:#fff; }
+  .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
+  h1 { margin:0 0 14px; font-size: 22px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: var(--gap); }
+  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
+          box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
+  .tile:active { transform: scale(.98); }
+  .emoji { font-size:42px; display:block; margin-bottom:8px; }
+  .sub { opacity:.75; font-size:12px; margin-top:4px; }
+  .note { opacity:.7; font-size:13px; margin-top:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Exercises</h1>
+  <div id="grid" class="grid"></div>
+  <div class="note">Tap a tile to open <code>#id</code>. We’ll wire the detail view next.</div>
+</div>
+
+<script>
+/* Back-friendly set for L3–S1 (units = default counter unit) */
+const EXERCISES = [
+  // Core (anti-movement)
+  {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
+  {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
+  {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
+  {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
+  {id:"pallof",           name:"Pallof Press",         emoji:"🎯", unit:"sec"},
+  {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
+
+  // Hips/Glutes
+  {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
+  {id:"hip-hinge",        name:"Hip-Hinge Drill",      emoji:"🪵", unit:"reps"},
+  {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
+  {id:"hip-abduction",    name:"Hip Abduction",        emoji:"🦵", unit:"reps"},
+  {id:"ham-bridge",       name:"Hamstring Bridge",     emoji:"🧴", unit:"reps"},
+
+  // Mobility / reset
+  {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
+  {id:"rock-back",        name:"Quadruped Rock-Back",  emoji:"🧎", unit:"reps"},
+  {id:"t-spine-extension",name:"T-Spine Extension",    emoji:"🧘", unit:"reps"},
+
+  // Upper body
+  {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
+  {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
+];
+
+(function renderGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = EXERCISES.map(x => `
+    <a class="tile" href="#${x.id}" aria-label="${x.name}">
+      <span class="emoji">${x.emoji}</span>
+      <div>${x.name}</div>
+      <div class="sub">${x.unit}</div>
+    </a>
+  `).join('');
+})();
+</script>
+</body>
+</html>
