@@ -1,4 +1,5 @@
-const CACHE = "ex-v1";
+const APP_VERSION = '2025-08-15-1';
+const CACHE = `static-${APP_VERSION}`;
 const ASSETS = [
   "./",
   "./index.html",
