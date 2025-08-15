@@ -54,16 +54,12 @@ const EXERCISES = [
   {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
   {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
   {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
-  {id:"pallof",           name:"Pallof Press",         emoji:"🎯", unit:"sec"},
   {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
   {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
-  {id:"hip-hinge",        name:"Hip-Hinge Drill",      emoji:"🪵", unit:"reps"},
   {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
-  {id:"hip-abduction",    name:"Hip Abduction",        emoji:"🦵", unit:"reps"},
-  {id:"ham-bridge",       name:"Hamstring Bridge",     emoji:"🧴", unit:"reps"},
   {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
-  {id:"rock-back",        name:"Quadruped Rock-Back",  emoji:"🧎", unit:"reps"},
-  {id:"t-spine-extension",name:"T-Spine Extension",    emoji:"🧘", unit:"reps"},
+  {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
+  {id:"rubber-band-row",  name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
   {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
   {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
 ];
@@ -251,7 +247,6 @@ function renderDetail(id) {
       const x = startX + i*(barW + barGap);
       const bh = (v / maxV) * h;
       const y = pad.t + h - bh;
-      // bar
       ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
     }
 
@@ -269,7 +264,6 @@ function renderDetail(id) {
   drawHistory();
   addEventListener('resize', drawHistory, {passive:true});
 
-  // initial feedback
   (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
 }
 
