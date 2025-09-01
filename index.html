@@ -38,7 +38,7 @@ if ("serviceWorker" in navigator) {
   input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
   .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
   .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
-  canvas { width:100%; height:180px; display:block; }
+  canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
   .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
   html, body { touch-action: manipulation; }
   .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -64,17 +64,34 @@ const EXERCISES = [
   {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
 ];
 
+const WINDOW_DAYS = 14; // visible window size; keep 14 but now pannable
+const MS_PER_DAY = 86400000;
+
 const app = document.getElementById('app');
-const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
+const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD (UTC)
 const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const addDays = (d, n) => { const dt = new Date(d); dt.setDate(dt.getDate()+n); return dt; };
+const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
 const isoDate = (d) => new Date(d).toISOString().slice(0,10);
+const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
 
 function keysFor(id, date) {
   return {
     count: `ex:${id}:${date}:count`,
     notes: `ex:${id}:${date}:notes`
   };
+}
+function daysBetween(a, b) { // whole days b - a
+  const aa = Date.UTC(new Date(a).getUTCFullYear(), new Date(a).getUTCMonth(), new Date(a).getUTCDate());
+  const bb = Date.UTC(new Date(b).getUTCFullYear(), new Date(b).getUTCMonth(), new Date(b).getUTCDate());
+  return Math.floor((bb - aa) / MS_PER_DAY);
+}
+function parseDateKey(k, id) {
+  // ex:<id>:YYYY-MM-DD:count
+  const pfx = `ex:${id}:`;
+  const sfx = `:count`;
+  if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
+  const ds = k.slice(pfx.length, -sfx.length);
+  return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
 }
 
 /* ---------- HOME (with tiny today totals) ---------- */
@@ -101,7 +118,7 @@ function renderHome() {
   `;
 }
 
-/* ---------- DETAIL (with minimal 14-day chart) ---------- */
+/* ---------- DETAIL (with pannable chart) ---------- */
 function renderDetail(id) {
   const ex = EXERCISES.find(e => e.id === id);
   if (!ex) { location.hash = ""; return; }
@@ -136,7 +153,7 @@ function renderDetail(id) {
       <div class="note" id="status">Saved</div>
 
       <div class="chart-wrap">
-        <div class="muted" style="margin:0 0 8px;">Last 14 days</div>
+        <div class="muted" id="rangeLabel" style="margin:0 0 8px;">Last ${WINDOW_DAYS} days — drag to scroll</div>
         <canvas id="chart" width="600" height="200"></canvas>
       </div>
     </div>`;
@@ -149,6 +166,7 @@ function renderDetail(id) {
   const $status = document.getElementById('status');
   const $day    = document.getElementById('day');
   const $chart  = document.getElementById('chart');
+  const $label  = document.getElementById('rangeLabel');
 
   const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
 
@@ -160,11 +178,13 @@ function renderDetail(id) {
     $count.textContent = isNaN(c) ? 0 : c;
     $notes.value = n;
     showSaved();
-    drawHistory(); // update tile chart if date changed
+    computeBounds(); // in case the chosen day is outside current max
+    drawHistory();
   }
   function saveCount(dateStr, n) {
     localStorage.setItem(storage(dateStr).count, String(n));
     showSaved();
+    computeBounds();
     drawHistory();
   }
   function saveNotes(dateStr, v) {
@@ -188,9 +208,34 @@ function renderDetail(id) {
 
   $day.addEventListener('change', () => loadFor($day.value));
 
-  // --- minimal chart (14 days, responsive, no libs) ---
-  function getHistory(days=14) {
-    const end = new Date(todayStr()); // today inclusive
+  // --- history helpers (window + panning) ---
+  let earliest = todayStr(); // updated by computeBounds
+  let latest = todayStr();   // cap at today
+  let maxOffsetDays = 0;     // how far back we can pan
+  let offsetDays = 0;        // 0 = window ends today; >0 pans into past
+  let pxPerDay = 8;          // updated per draw; used for drag mapping
+
+  function computeBounds() {
+    // scan localStorage for this exercise's dates (counts only)
+    let minDS = todayStr(), hasAny = false;
+    for (let i=0;i<localStorage.length;i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const ds = parseDateKey(k, id);
+      if (ds) {
+        hasAny = true;
+        if (ds < minDS) minDS = ds;
+      }
+    }
+    const today = todayStr();
+    earliest = hasAny ? minDS : today;
+    latest = today; // we only chart up to today
+    maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
+    offsetDays = clamp(offsetDays, 0, maxOffsetDays);
+  }
+
+  function getHistoryWindow(endISO, days) {
+    const end = new Date(endISO);
     const start = addDays(end, -(days-1));
     const labels = [];
     const values = [];
@@ -201,11 +246,14 @@ function renderDetail(id) {
       labels.push(ds.slice(5)); // MM-DD
       values.push(isNaN(v)?0:v);
     }
-    return { labels, values };
+    return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
   }
 
+  // --- drawing + interactions ---
   function drawHistory() {
-    const { labels, values } = getHistory(14);
+    const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
+    const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
+
     const dpr = window.devicePixelRatio || 1;
     const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
     $chart.width = Math.round(cssW * dpr);
@@ -215,12 +263,13 @@ function renderDetail(id) {
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,cssW,cssH);
 
-    const pad = { l: 28, r: 8, t: 8, b: 22 };
+    const pad = { l: 32, r: 8, t: 8, b: 24 };
     const w = cssW - pad.l - pad.r;
     const h = cssH - pad.t - pad.b;
     const maxV = Math.max(5, ...values);
     const barGap = 6;
     const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
+    pxPerDay = w / WINDOW_DAYS;
 
     // axes
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -242,7 +291,9 @@ function renderDetail(id) {
     // bars
     const startX = pad.l;
     ctx.fillStyle = '#6ea8fe';
-    for (let i=0;i<values.length;i++) {
+    for (let i=0;i${
+      ''
+    }<values.length;i++) {
       const v = values[i];
       const x = startX + i*(barW + barGap);
       const bh = (v / maxV) * h;
@@ -250,17 +301,66 @@ function renderDetail(id) {
       ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
     }
 
-    // x labels (sparse to avoid clutter)
+    // x labels (sparse)
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    const step = Math.ceil(labels.length / 5); // ~5 labels
+    const step = Math.max(1, Math.ceil(labels.length / 5)); // ~5 labels
     for (let i=0;i<labels.length;i+=step) {
       const x = startX + i*(barW + barGap) + barW/2;
       ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
     }
+
+    // range label
+    $label.textContent = `${startISO} → ${eISO}  •  drag / Shift+wheel / ← →`;
   }
 
+  // Pointer drag to pan
+  let dragging = false;
+  let startX = 0;
+  $chart.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    startX = e.clientX;
+    $chart.setPointerCapture(e.pointerId);
+    $chart.style.cursor = 'grabbing';
+  });
+  $chart.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - startX;
+    const deltaDays = Math.round(dx / pxPerDay);
+    if (deltaDays !== 0) {
+      offsetDays = clamp(offsetDays - deltaDays, 0, maxOffsetDays);
+      startX += deltaDays * pxPerDay; // keep smooth
+      drawHistory();
+    }
+  });
+  function endDrag(e){
+    if (!dragging) return;
+    dragging = false;
+    $chart.style.cursor = 'grab';
+    try { $chart.releasePointerCapture(e.pointerId); } catch {}
+  }
+  $chart.addEventListener('pointerup', endDrag);
+  $chart.addEventListener('pointercancel', endDrag);
+  $chart.addEventListener('pointerleave', endDrag);
+
+  // Wheel (Shift for horizontal on many systems)
+  $chart.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    // scroll ~3 days per notch
+    offsetDays = clamp(offsetDays + (delta > 0 ? 3 : -3), 0, maxOffsetDays);
+    drawHistory();
+  }, {passive:false});
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+    if (e.key === 'ArrowRight'){ offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+  });
+
+  // initial paint
+  computeBounds();
   drawHistory();
   addEventListener('resize', drawHistory, {passive:true});
 
