@@ -64,7 +64,7 @@
           {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
       ];
 
-      const WINDOW_DAYS = 14; // visible window size; keep 14 but now pannable
+      const WINDOW_DAYS = 14; // visible window size
       const MS_PER_DAY = 86400000;
 
       const app = document.getElementById('app');
@@ -80,21 +80,20 @@
               notes: `ex:${id}:${date}:notes`
           };
       }
-      function daysBetween(a, b) { // whole days b - a
-          const aa = Date.UTC(new Date(a).getUTCFullYear(), new Date(a).getUTCMonth(), new Date(a).getUTCDate());
-          const bb = Date.UTC(new Date(b).getUTCFullYear(), new Date(b).getUTCMonth(), new Date(b).getUTCDate());
+      function daysBetween(a, b) {
+          const A = new Date(a), B = new Date(b);
+          const aa = Date.UTC(A.getUTCFullYear(), A.getUTCMonth(), A.getUTCDate());
+          const bb = Date.UTC(B.getUTCFullYear(), B.getUTCMonth(), B.getUTCDate());
           return Math.floor((bb - aa) / MS_PER_DAY);
       }
       function parseDateKey(k, id) {
-          // ex:<id>:YYYY-MM-DD:count
-          const pfx = `ex:${id}:`;
-          const sfx = `:count`;
+          const pfx = `ex:${id}:`, sfx = `:count`;
           if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
           const ds = k.slice(pfx.length, -sfx.length);
           return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
       }
 
-      /* ---------- HOME (with tiny today totals) ---------- */
+      /* ---------- HOME ---------- */
       function renderHome() {
           document.title = "Exercises";
           const today = todayStr();
@@ -118,7 +117,7 @@
   `;
       }
 
-      /* ---------- DETAIL (with pannable chart) ---------- */
+      /* ---------- DETAIL (pannable chart, reversed direction) ---------- */
       function renderDetail(id) {
           const ex = EXERCISES.find(e => e.id === id);
           if (!ex) { location.hash = ""; return; }
@@ -153,7 +152,7 @@
       <div class="note" id="status">Saved</div>
 
       <div class="chart-wrap">
-        <div class="muted" id="rangeLabel" style="margin:0 0 8px;">Last ${WINDOW_DAYS} days — drag to scroll</div>
+        <div class="muted" id="rangeLabel" style="margin:0 0 8px;"></div>
         <canvas id="chart" width="600" height="200"></canvas>
       </div>
     </div>`;
@@ -178,7 +177,7 @@
               $count.textContent = isNaN(c) ? 0 : c;
               $notes.value = n;
               showSaved();
-              computeBounds(); // in case the chosen day is outside current max
+              computeBounds();
               drawHistory();
           }
           function saveCount(dateStr, n) {
@@ -208,28 +207,24 @@
 
           $day.addEventListener('change', () => loadFor($day.value));
 
-          // --- history helpers (window + panning) ---
-          let earliest = todayStr(); // updated by computeBounds
-          let latest = todayStr();   // cap at today
-          let maxOffsetDays = 0;     // how far back we can pan
-          let offsetDays = 0;        // 0 = window ends today; >0 pans into past
-          let pxPerDay = 8;          // updated per draw; used for drag mapping
+          // --- history window + panning state ---
+          let earliest = todayStr();
+          let latest = todayStr();
+          let maxOffsetDays = 0;
+          let offsetDays = 0;   // 0 = window ends today; larger = older window
+          let pxPerDay = 8;
 
           function computeBounds() {
-              // scan localStorage for this exercise's dates (counts only)
               let minDS = todayStr(), hasAny = false;
               for (let i=0;i<localStorage.length;i++) {
                   const k = localStorage.key(i);
                   if (!k) continue;
                   const ds = parseDateKey(k, id);
-                  if (ds) {
-                      hasAny = true;
-                      if (ds < minDS) minDS = ds;
-                  }
+                  if (ds) { hasAny = true; if (ds < minDS) minDS = ds; }
               }
               const today = todayStr();
               earliest = hasAny ? minDS : today;
-              latest = today; // we only chart up to today
+              latest = today;
               maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
               offsetDays = clamp(offsetDays, 0, maxOffsetDays);
           }
@@ -249,6 +244,7 @@
               return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
           }
 
+          // --- drawing ---
           function drawHistory() {
               const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
               const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
@@ -308,14 +304,14 @@
                   ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
               }
 
-              // range label
-              $label.textContent = `${startISO} → ${eISO}  •  drag / Shift+wheel / ← →`;
+              // range label — hint removed
+              $label.textContent = `${startISO} → ${eISO}`;
           }
 
-
-          // Pointer drag to pan
+          // --- interactions (reversed direction) ---
           let dragging = false;
           let startX = 0;
+
           $chart.addEventListener('pointerdown', (e) => {
               dragging = true;
               startX = e.clientX;
@@ -327,8 +323,9 @@
               const dx = e.clientX - startX;
               const deltaDays = Math.round(dx / pxPerDay);
               if (deltaDays !== 0) {
-                  offsetDays = clamp(offsetDays - deltaDays, 0, maxOffsetDays);
-                  startX += deltaDays * pxPerDay; // keep smooth
+                  // reversed vs earlier version
+                  offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
+                  startX += deltaDays * pxPerDay;
                   drawHistory();
               }
           });
@@ -342,22 +339,22 @@
           $chart.addEventListener('pointercancel', endDrag);
           $chart.addEventListener('pointerleave', endDrag);
 
-          // Wheel (Shift for horizontal on many systems)
+          // Wheel (Shift for horizontal on many systems). Reversed mapping.
           $chart.addEventListener('wheel', (e) => {
               e.preventDefault();
               const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-              // scroll ~3 days per notch
-              offsetDays = clamp(offsetDays + (delta > 0 ? 3 : -3), 0, maxOffsetDays);
+              offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
               drawHistory();
           }, {passive:false});
 
-          // Keyboard
-          document.addEventListener('keydown', (e) => {
-              if (e.key === 'ArrowLeft') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
-              if (e.key === 'ArrowRight'){ offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
-          });
+          // Keyboard: ← newer, → older (reversed from earlier)
+          const onKey = (e) => {
+              if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+              if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+          };
+          document.addEventListener('keydown', onKey);
 
-          // initial paint
+          // init
           computeBounds();
           drawHistory();
           addEventListener('resize', drawHistory, {passive:true});
