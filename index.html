@@ -1,108 +1,108 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Exercises</title>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <title>Exercises</title>
 
-<link rel="manifest" href="./manifest.json">
-<script>
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./service-worker.js");
-}
-</script>
+    <link rel="manifest" href="./manifest.json">
+    <script>
+      if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.register("./service-worker.js");
+      }
+    </script>
 
-<style>
-  :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
-  body { margin:0; background:#0b0b0f; color:#fff; }
-  .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
-  h1 { margin:0 0 14px; font-size:22px; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: var(--gap); }
-  .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
-          box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
-  .tile:active { transform: scale(.98); }
-  .emoji { font-size:42px; display:block; margin-bottom:8px; }
-  .sub { opacity:.75; font-size:12px; margin-top:4px; }
-  .tiny { opacity:.6; font-size:12px; margin-top:6px; }
+    <style>
+      :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
+      body { margin:0; background:#0b0b0f; color:#fff; }
+      .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
+      h1 { margin:0 0 14px; font-size:22px; }
+      .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: var(--gap); }
+      .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
+              box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
+      .tile:active { transform: scale(.98); }
+      .emoji { font-size:42px; display:block; margin-bottom:8px; }
+      .sub { opacity:.75; font-size:12px; margin-top:4px; }
+      .tiny { opacity:.6; font-size:12px; margin-top:6px; }
 
-  .card { max-width: 560px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
-  .back { display:inline-block; margin-bottom:14px; color:#9aa1ff; text-decoration:none; }
-  .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-  .muted { opacity:.75; font-size:13px; }
-  .stepper { display:flex; align-items:center; gap:12px; margin-top: 8px; }
-  .btn { border:0; border-radius:12px; padding:14px 18px; background:#1f2030; color:#fff; font-size:20px; line-height:1; transition: transform .1s ease, background .2s ease; }
-  .btn:active { transform: scale(0.97); }
-  .count { font-variant-numeric: tabular-nums; font-size:42px; min-width: 4.5ch; text-align:center; }
-  label { display:block; margin:18px 0 6px; opacity:.85; }
-  input[type="text"] { width:100%; font-size:18px; padding:12px 14px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
-  input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
-  .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
-  .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
-  canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
-  .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
-  html, body { touch-action: manipulation; }
-  .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-</style>
-</head>
-<body>
-<div class="wrap" id="app"></div>
+      .card { max-width: 560px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
+      .back { display:inline-block; margin-bottom:14px; color:#9aa1ff; text-decoration:none; }
+      .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .muted { opacity:.75; font-size:13px; }
+      .stepper { display:flex; align-items:center; gap:12px; margin-top: 8px; }
+      .btn { border:0; border-radius:12px; padding:14px 18px; background:#1f2030; color:#fff; font-size:20px; line-height:1; transition: transform .1s ease, background .2s ease; }
+      .btn:active { transform: scale(0.97); }
+      .count { font-variant-numeric: tabular-nums; font-size:42px; min-width: 4.5ch; text-align:center; }
+      label { display:block; margin:18px 0 6px; opacity:.85; }
+      input[type="text"] { width:100%; font-size:18px; padding:12px 14px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
+      input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
+      .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
+      .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
+      canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
+      .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+      html, body { touch-action: manipulation; }
+      .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap" id="app"></div>
 
-<script>
-/* ====== CONFIG: your back-friendly exercise set ====== */
-const EXERCISES = [
-  {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
-  {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
-  {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
-  {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
-  {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
-  {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
-  {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
-  {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
-  {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
-  {id:"rubber-band-row",  name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
-  {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
-  {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
-];
+    <script>
+      /* ====== CONFIG: your back-friendly exercise set ====== */
+      const EXERCISES = [
+          {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
+          {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
+          {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
+          {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
+          {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
+          {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
+          {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
+          {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
+          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
+          {id:"rubber-band-row",  name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
+          {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
+          {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
+      ];
 
-const WINDOW_DAYS = 14; // visible window size; keep 14 but now pannable
-const MS_PER_DAY = 86400000;
+      const WINDOW_DAYS = 14; // visible window size; keep 14 but now pannable
+      const MS_PER_DAY = 86400000;
 
-const app = document.getElementById('app');
-const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD (UTC)
-const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
-const isoDate = (d) => new Date(d).toISOString().slice(0,10);
-const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
+      const app = document.getElementById('app');
+      const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD (UTC)
+      const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
+      const isoDate = (d) => new Date(d).toISOString().slice(0,10);
+      const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
 
-function keysFor(id, date) {
-  return {
-    count: `ex:${id}:${date}:count`,
-    notes: `ex:${id}:${date}:notes`
-  };
-}
-function daysBetween(a, b) { // whole days b - a
-  const aa = Date.UTC(new Date(a).getUTCFullYear(), new Date(a).getUTCMonth(), new Date(a).getUTCDate());
-  const bb = Date.UTC(new Date(b).getUTCFullYear(), new Date(b).getUTCMonth(), new Date(b).getUTCDate());
-  return Math.floor((bb - aa) / MS_PER_DAY);
-}
-function parseDateKey(k, id) {
-  // ex:<id>:YYYY-MM-DD:count
-  const pfx = `ex:${id}:`;
-  const sfx = `:count`;
-  if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
-  const ds = k.slice(pfx.length, -sfx.length);
-  return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
-}
+      function keysFor(id, date) {
+          return {
+              count: `ex:${id}:${date}:count`,
+              notes: `ex:${id}:${date}:notes`
+          };
+      }
+      function daysBetween(a, b) { // whole days b - a
+          const aa = Date.UTC(new Date(a).getUTCFullYear(), new Date(a).getUTCMonth(), new Date(a).getUTCDate());
+          const bb = Date.UTC(new Date(b).getUTCFullYear(), new Date(b).getUTCMonth(), new Date(b).getUTCDate());
+          return Math.floor((bb - aa) / MS_PER_DAY);
+      }
+      function parseDateKey(k, id) {
+          // ex:<id>:YYYY-MM-DD:count
+          const pfx = `ex:${id}:`;
+          const sfx = `:count`;
+          if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
+          const ds = k.slice(pfx.length, -sfx.length);
+          return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
+      }
 
-/* ---------- HOME (with tiny today totals) ---------- */
-function renderHome() {
-  document.title = "Exercises";
-  const today = todayStr();
+      /* ---------- HOME (with tiny today totals) ---------- */
+      function renderHome() {
+          document.title = "Exercises";
+          const today = todayStr();
 
-  const tiles = EXERCISES.map(x => {
-    const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
-    const tiny = `Today: ${isNaN(count)?0:count} ${x.unit}`;
-    return `
+          const tiles = EXERCISES.map(x => {
+              const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
+              const tiny = `Today: ${isNaN(count)?0:count} ${x.unit}`;
+              return `
       <a class="tile" href="#${x.id}" aria-label="${x.name}">
         <span class="emoji">${x.emoji}</span>
         <div>${x.name}</div>
@@ -110,27 +110,27 @@ function renderHome() {
         <div class="tiny">${tiny}</div>
       </a>
     `;
-  }).join('');
+          }).join('');
 
-  app.innerHTML = `
+          app.innerHTML = `
     <h1>Exercises</h1>
     <div class="grid fade">${tiles}</div>
   `;
-}
+      }
 
-/* ---------- DETAIL (with pannable chart) ---------- */
-function renderDetail(id) {
-  const ex = EXERCISES.find(e => e.id === id);
-  if (!ex) { location.hash = ""; return; }
+      /* ---------- DETAIL (with pannable chart) ---------- */
+      function renderDetail(id) {
+          const ex = EXERCISES.find(e => e.id === id);
+          if (!ex) { location.hash = ""; return; }
 
-  const date = todayStr();
-  const k = keysFor(id, date);
-  const count = parseInt(localStorage.getItem(k.count) || "0", 10);
-  const notes = localStorage.getItem(k.notes) || "";
+          const date = todayStr();
+          const k = keysFor(id, date);
+          const count = parseInt(localStorage.getItem(k.count) || "0", 10);
+          const notes = localStorage.getItem(k.notes) || "";
 
-  document.title = `${ex.name}`;
+          document.title = `${ex.name}`;
 
-  app.innerHTML = `
+          app.innerHTML = `
     <a class="back" href="#">← All exercises</a>
     <div class="card fade">
       <div class="row">
@@ -158,222 +158,220 @@ function renderDetail(id) {
       </div>
     </div>`;
 
-  // --- wiring ---
-  const $count  = document.getElementById('count');
-  const $minus  = document.getElementById('minus');
-  const $plus   = document.getElementById('plus');
-  const $notes  = document.getElementById('notes');
-  const $status = document.getElementById('status');
-  const $day    = document.getElementById('day');
-  const $chart  = document.getElementById('chart');
-  const $label  = document.getElementById('rangeLabel');
+          // --- wiring ---
+          const $count  = document.getElementById('count');
+          const $minus  = document.getElementById('minus');
+          const $plus   = document.getElementById('plus');
+          const $notes  = document.getElementById('notes');
+          const $status = document.getElementById('status');
+          const $day    = document.getElementById('day');
+          const $chart  = document.getElementById('chart');
+          const $label  = document.getElementById('rangeLabel');
 
-  const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
+          const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
 
-  function storage(dateStr) { return keysFor(id, dateStr); }
-  function loadFor(dateStr) {
-    const kk = storage(dateStr);
-    const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
-    const n = localStorage.getItem(kk.notes) || "";
-    $count.textContent = isNaN(c) ? 0 : c;
-    $notes.value = n;
-    showSaved();
-    computeBounds(); // in case the chosen day is outside current max
-    drawHistory();
-  }
-  function saveCount(dateStr, n) {
-    localStorage.setItem(storage(dateStr).count, String(n));
-    showSaved();
-    computeBounds();
-    drawHistory();
-  }
-  function saveNotes(dateStr, v) {
-    localStorage.setItem(storage(dateStr).notes, v);
-    showSaved();
-  }
+          function storage(dateStr) { return keysFor(id, dateStr); }
+          function loadFor(dateStr) {
+              const kk = storage(dateStr);
+              const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
+              const n = localStorage.getItem(kk.notes) || "";
+              $count.textContent = isNaN(c) ? 0 : c;
+              $notes.value = n;
+              showSaved();
+              computeBounds(); // in case the chosen day is outside current max
+              drawHistory();
+          }
+          function saveCount(dateStr, n) {
+              localStorage.setItem(storage(dateStr).count, String(n));
+              showSaved();
+              computeBounds();
+              drawHistory();
+          }
+          function saveNotes(dateStr, v) {
+              localStorage.setItem(storage(dateStr).notes, v);
+              showSaved();
+          }
 
-  $plus.addEventListener('click', () => {
-    const n = parseInt($count.textContent,10) + 1;
-    $count.textContent = n; saveCount($day.value, n);
-  }, {passive:true});
+          $plus.addEventListener('click', () => {
+              const n = parseInt($count.textContent,10) + 1;
+              $count.textContent = n; saveCount($day.value, n);
+          }, {passive:true});
 
-  $minus.addEventListener('click', () => {
-    const n = Math.max(0, parseInt($count.textContent,10) - 1);
-    $count.textContent = n; saveCount($day.value, n);
-  }, {passive:true});
+          $minus.addEventListener('click', () => {
+              const n = Math.max(0, parseInt($count.textContent,10) - 1);
+              $count.textContent = n; saveCount($day.value, n);
+          }, {passive:true});
 
-  let t; $notes.addEventListener('input', (e) => {
-    clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
-  });
+          let t; $notes.addEventListener('input', (e) => {
+              clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
+          });
 
-  $day.addEventListener('change', () => loadFor($day.value));
+          $day.addEventListener('change', () => loadFor($day.value));
 
-  // --- history helpers (window + panning) ---
-  let earliest = todayStr(); // updated by computeBounds
-  let latest = todayStr();   // cap at today
-  let maxOffsetDays = 0;     // how far back we can pan
-  let offsetDays = 0;        // 0 = window ends today; >0 pans into past
-  let pxPerDay = 8;          // updated per draw; used for drag mapping
+          // --- history helpers (window + panning) ---
+          let earliest = todayStr(); // updated by computeBounds
+          let latest = todayStr();   // cap at today
+          let maxOffsetDays = 0;     // how far back we can pan
+          let offsetDays = 0;        // 0 = window ends today; >0 pans into past
+          let pxPerDay = 8;          // updated per draw; used for drag mapping
 
-  function computeBounds() {
-    // scan localStorage for this exercise's dates (counts only)
-    let minDS = todayStr(), hasAny = false;
-    for (let i=0;i<localStorage.length;i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      const ds = parseDateKey(k, id);
-      if (ds) {
-        hasAny = true;
-        if (ds < minDS) minDS = ds;
+          function computeBounds() {
+              // scan localStorage for this exercise's dates (counts only)
+              let minDS = todayStr(), hasAny = false;
+              for (let i=0;i<localStorage.length;i++) {
+                  const k = localStorage.key(i);
+                  if (!k) continue;
+                  const ds = parseDateKey(k, id);
+                  if (ds) {
+                      hasAny = true;
+                      if (ds < minDS) minDS = ds;
+                  }
+              }
+              const today = todayStr();
+              earliest = hasAny ? minDS : today;
+              latest = today; // we only chart up to today
+              maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
+              offsetDays = clamp(offsetDays, 0, maxOffsetDays);
+          }
+
+          function getHistoryWindow(endISO, days) {
+              const end = new Date(endISO);
+              const start = addDays(end, -(days-1));
+              const labels = [];
+              const values = [];
+              for (let i=0;i<days;i++) {
+                  const d = addDays(start, i);
+                  const ds = isoDate(d);
+                  const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+                  labels.push(ds.slice(5)); // MM-DD
+                  values.push(isNaN(v)?0:v);
+              }
+              return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
+          }
+
+          function drawHistory() {
+              const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
+              const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
+
+              const dpr = window.devicePixelRatio || 1;
+              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
+              $chart.width = Math.round(cssW * dpr);
+              $chart.height = Math.round(cssH * dpr);
+
+              const ctx = $chart.getContext('2d');
+              ctx.setTransform(dpr,0,0,dpr,0,0);
+              ctx.clearRect(0,0,cssW,cssH);
+
+              const pad = { l: 32, r: 8, t: 8, b: 24 };
+              const w = cssW - pad.l - pad.r;
+              const h = cssH - pad.t - pad.b;
+              const maxV = Math.max(5, ...values);
+              const barGap = 6;
+              const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
+              pxPerDay = w / WINDOW_DAYS;
+
+              // axes
+              ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pad.l, pad.t);
+              ctx.lineTo(pad.l, pad.t + h);
+              ctx.lineTo(pad.l + w, pad.t + h);
+              ctx.stroke();
+
+              // y ticks
+              ctx.fillStyle = 'rgba(255,255,255,0.6)';
+              ctx.font = '12px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('0', pad.l - 6, pad.t + h);
+              ctx.fillText(String(maxV), pad.l - 6, pad.t);
+
+              // bars
+              const startX = pad.l;
+              ctx.fillStyle = '#6ea8fe';
+              for (let i = 0; i < values.length; i++) {
+                  const v = values[i];
+                  const x = startX + i * (barW + barGap);
+                  const bh = (v / maxV) * h;
+                  const y = pad.t + h - bh;
+                  ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
+              }
+
+              // x labels (sparse)
+              ctx.fillStyle = 'rgba(255,255,255,0.6)';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+              const step = Math.max(1, Math.ceil(labels.length / 5));
+              for (let i = 0; i < labels.length; i += step) {
+                  const x = startX + i * (barW + barGap) + barW / 2;
+                  ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
+              }
+
+              // range label
+              $label.textContent = `${startISO} → ${eISO}  •  drag / Shift+wheel / ← →`;
+          }
+
+
+          // Pointer drag to pan
+          let dragging = false;
+          let startX = 0;
+          $chart.addEventListener('pointerdown', (e) => {
+              dragging = true;
+              startX = e.clientX;
+              $chart.setPointerCapture(e.pointerId);
+              $chart.style.cursor = 'grabbing';
+          });
+          $chart.addEventListener('pointermove', (e) => {
+              if (!dragging) return;
+              const dx = e.clientX - startX;
+              const deltaDays = Math.round(dx / pxPerDay);
+              if (deltaDays !== 0) {
+                  offsetDays = clamp(offsetDays - deltaDays, 0, maxOffsetDays);
+                  startX += deltaDays * pxPerDay; // keep smooth
+                  drawHistory();
+              }
+          });
+          function endDrag(e){
+              if (!dragging) return;
+              dragging = false;
+              $chart.style.cursor = 'grab';
+              try { $chart.releasePointerCapture(e.pointerId); } catch {}
+          }
+          $chart.addEventListener('pointerup', endDrag);
+          $chart.addEventListener('pointercancel', endDrag);
+          $chart.addEventListener('pointerleave', endDrag);
+
+          // Wheel (Shift for horizontal on many systems)
+          $chart.addEventListener('wheel', (e) => {
+              e.preventDefault();
+              const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+              // scroll ~3 days per notch
+              offsetDays = clamp(offsetDays + (delta > 0 ? 3 : -3), 0, maxOffsetDays);
+              drawHistory();
+          }, {passive:false});
+
+          // Keyboard
+          document.addEventListener('keydown', (e) => {
+              if (e.key === 'ArrowLeft') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+              if (e.key === 'ArrowRight'){ offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+          });
+
+          // initial paint
+          computeBounds();
+          drawHistory();
+          addEventListener('resize', drawHistory, {passive:true});
+
+          (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
       }
-    }
-    const today = todayStr();
-    earliest = hasAny ? minDS : today;
-    latest = today; // we only chart up to today
-    maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
-    offsetDays = clamp(offsetDays, 0, maxOffsetDays);
-  }
 
-  function getHistoryWindow(endISO, days) {
-    const end = new Date(endISO);
-    const start = addDays(end, -(days-1));
-    const labels = [];
-    const values = [];
-    for (let i=0;i<days;i++) {
-      const d = addDays(start, i);
-      const ds = isoDate(d);
-      const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-      labels.push(ds.slice(5)); // MM-DD
-      values.push(isNaN(v)?0:v);
-    }
-    return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
-  }
-
-  // --- drawing + interactions ---
-  function drawHistory() {
-    const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
-    const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
-
-    const dpr = window.devicePixelRatio || 1;
-    const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
-    $chart.width = Math.round(cssW * dpr);
-    $chart.height = Math.round(cssH * dpr);
-
-    const ctx = $chart.getContext('2d');
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.clearRect(0,0,cssW,cssH);
-
-    const pad = { l: 32, r: 8, t: 8, b: 24 };
-    const w = cssW - pad.l - pad.r;
-    const h = cssH - pad.t - pad.b;
-    const maxV = Math.max(5, ...values);
-    const barGap = 6;
-    const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
-    pxPerDay = w / WINDOW_DAYS;
-
-    // axes
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(pad.l, pad.t);
-    ctx.lineTo(pad.l, pad.t + h);
-    ctx.lineTo(pad.l + w, pad.t + h);
-    ctx.stroke();
-
-    // y ticks (0, max)
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '12px -apple-system, system-ui, Arial';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('0', pad.l - 6, pad.t + h);
-    ctx.fillText(String(maxV), pad.l - 6, pad.t);
-
-    // bars
-    const startX = pad.l;
-    ctx.fillStyle = '#6ea8fe';
-    for (let i=0;i${
-      ''
-    }<values.length;i++) {
-      const v = values[i];
-      const x = startX + i*(barW + barGap);
-      const bh = (v / maxV) * h;
-      const y = pad.t + h - bh;
-      ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
-    }
-
-    // x labels (sparse)
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const step = Math.max(1, Math.ceil(labels.length / 5)); // ~5 labels
-    for (let i=0;i<labels.length;i+=step) {
-      const x = startX + i*(barW + barGap) + barW/2;
-      ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
-    }
-
-    // range label
-    $label.textContent = `${startISO} → ${eISO}  •  drag / Shift+wheel / ← →`;
-  }
-
-  // Pointer drag to pan
-  let dragging = false;
-  let startX = 0;
-  $chart.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    startX = e.clientX;
-    $chart.setPointerCapture(e.pointerId);
-    $chart.style.cursor = 'grabbing';
-  });
-  $chart.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    const deltaDays = Math.round(dx / pxPerDay);
-    if (deltaDays !== 0) {
-      offsetDays = clamp(offsetDays - deltaDays, 0, maxOffsetDays);
-      startX += deltaDays * pxPerDay; // keep smooth
-      drawHistory();
-    }
-  });
-  function endDrag(e){
-    if (!dragging) return;
-    dragging = false;
-    $chart.style.cursor = 'grab';
-    try { $chart.releasePointerCapture(e.pointerId); } catch {}
-  }
-  $chart.addEventListener('pointerup', endDrag);
-  $chart.addEventListener('pointercancel', endDrag);
-  $chart.addEventListener('pointerleave', endDrag);
-
-  // Wheel (Shift for horizontal on many systems)
-  $chart.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    // scroll ~3 days per notch
-    offsetDays = clamp(offsetDays + (delta > 0 ? 3 : -3), 0, maxOffsetDays);
-    drawHistory();
-  }, {passive:false});
-
-  // Keyboard
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
-    if (e.key === 'ArrowRight'){ offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
-  });
-
-  // initial paint
-  computeBounds();
-  drawHistory();
-  addEventListener('resize', drawHistory, {passive:true});
-
-  (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
-}
-
-/* ---------- ROUTER ---------- */
-function route() {
-  const id = location.hash.replace(/^#/, '');
-  if (id) renderDetail(id); else renderHome();
-}
-addEventListener('hashchange', route, {passive:true});
-route();
-</script>
-</body>
+      /* ---------- ROUTER ---------- */
+      function route() {
+          const id = location.hash.replace(/^#/, '');
+          if (id) renderDetail(id); else renderHome();
+      }
+      addEventListener('hashchange', route, {passive:true});
+      route();
+    </script>
+  </body>
 </html>
