@@ -42,366 +42,342 @@
       .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
       .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-
-      /* simple inline checkbox styling (optional) */
-      .checkline { display:flex; align-items:center; gap:10px; margin-top:12px; }
-      .checkline input[type="checkbox"] { width:20px; height:20px; }
     </style>
   </head>
   <body>
     <div class="wrap" id="app"></div>
 
     <script>
-      /* ====== CONFIG ====== */
+      /* ====== CONFIG: your back-friendly exercise set ====== */
       const EXERCISES = [
-          /* Stretches → now binary checkboxes */
-          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", emoji:"🦵", unit:"check", binary:true},
-          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         emoji:"🧘", unit:"check", binary:true},
-      {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      emoji:"🧘", unit:"check", binary:true},
+          /* Stretches */
+	  {id:"low-trunk-rotation", name:"Low Trunk Rotation",               emoji:"🔁", unit:"sec"},
+          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", emoji:"🦵", unit:"sec"},
+          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         emoji:"🧘", unit:"sec"},
+          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      emoji:"🧘", unit:"sec"},
 
-      /* Existing (counters) */
-      {id:"side-plank",       name:"Side Plank",           emoji:"🧱", unit:"sec"},
-      {id:"bird-dog",         name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
-      {id:"mcgill-curlup",    name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
-      {id:"dead-bug",         name:"Dead Bug",             emoji:"🪲", unit:"reps"},
-      {id:"suitcase-carry",   name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
-      {id:"glute-bridge",     name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
-      {id:"clamshell",        name:"Clamshell",            emoji:"🐚", unit:"reps"},
-      {id:"cat-camel",        name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
-      {id:"prone-flutter-kick", name:"Prone Flutter Kick",  emoji:"🏊", unit:"sec"},
-      {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
-      {id:"rubber-band-row",  name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
-      {id:"running",            name:"Running",              emoji:"🏃", unit:"100m"},
-      {id:"pushups",          name:"Push-Ups",             emoji:"🤸", unit:"reps"},
-      {id:"pullups",          name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
+          /* Exercises */
+          {id:"side-plank",         name:"Side Plank",           emoji:"🧱", unit:"sec"},
+          {id:"bird-dog",           name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
+          {id:"dead-bug",           name:"Dead Bug",             emoji:"🪲", unit:"reps"},
+          {id:"suitcase-carry",     name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
+          {id:"glute-bridge",       name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
+          {id:"clamshell",          name:"Clamshell",            emoji:"🐚", unit:"reps"},
+          {id:"cat-camel",          name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
+          {id:"prone-flutter-kick", name:"Prone Flutter Kick",  emoji:"🏊", unit:"sec"},
+          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
+          {id:"rubber-band-row",    name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
+          {id:"running",            name:"Running",              emoji:"🏃", unit:"100m"},
+          {id:"pushups",            name:"Push-Ups",             emoji:"🤸", unit:"reps"},
+          {id:"pullups",            name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
       ];
 
-      const WINDOW_DAYS = 14;
+      const WINDOW_DAYS = 14; // visible window size
       const MS_PER_DAY = 86400000;
 
       const app = document.getElementById('app');
       const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD (UTC)
-	const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
-const isoDate = (d) => new Date(d).toISOString().slice(0,10);
-const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
+      const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
+      const isoDate = (d) => new Date(d).toISOString().slice(0,10);
+      const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
 
-function keysFor(id, date) {
-return { count: `ex:${id}:${date}:count`, notes: `ex:${id}:${date}:notes` };
-}
-function daysBetween(a, b) {
-const A = new Date(a), B = new Date(b);
-const aa = Date.UTC(A.getUTCFullYear(), A.getUTCMonth(), A.getUTCDate());
-const bb = Date.UTC(B.getUTCFullYear(), B.getUTCMonth(), B.getUTCDate());
-return Math.floor((bb - aa) / MS_PER_DAY);
-}
-function parseDateKey(k, id) {
-const pfx = `ex:${id}:`, sfx = `:count`;
-if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
-const ds = k.slice(pfx.length, -sfx.length);
-return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
-}
+      function keysFor(id, date) {
+          return {
+              count: `ex:${id}:${date}:count`,
+              notes: `ex:${id}:${date}:notes`
+          };
+      }
+      function daysBetween(a, b) {
+          const A = new Date(a), B = new Date(b);
+          const aa = Date.UTC(A.getUTCFullYear(), A.getUTCMonth(), A.getUTCDate());
+          const bb = Date.UTC(B.getUTCFullYear(), B.getUTCMonth(), B.getUTCDate());
+          return Math.floor((bb - aa) / MS_PER_DAY);
+      }
+      function parseDateKey(k, id) {
+          const pfx = `ex:${id}:`, sfx = `:count`;
+          if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
+          const ds = k.slice(pfx.length, -sfx.length);
+          return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
+      }
 
-/* ---------- HOME ---------- */
-function renderHome() {
-document.title = "Exercises";
-const today = todayStr();
+      /* ---------- HOME ---------- */
+      function renderHome() {
+          document.title = "Exercises";
+          const today = todayStr();
 
-const tiles = EXERCISES.map(x => {
-const raw = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
-const tiny = x.binary
-? `Today: ${(!isNaN(raw) && raw > 0) ? '✓' : '—'}`
-: `Today: ${isNaN(raw)?0:raw} ${x.unit}`;
-return `
-<a class="tile" href="#${x.id}" aria-label="${x.name}">
-  <span class="emoji">${x.emoji}</span>
-  <div>${x.name}</div>
-  <div class="sub">${x.binary ? 'check' : x.unit}</div>
-  <div class="tiny">${tiny}</div>
-</a>`;
-}).join('');
+          const tiles = EXERCISES.map(x => {
+              const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
+              const tiny = `Today: ${isNaN(count)?0:count} ${x.unit}`;
+              return `
+      <a class="tile" href="#${x.id}" aria-label="${x.name}">
+        <span class="emoji">${x.emoji}</span>
+        <div>${x.name}</div>
+        <div class="sub">${x.unit}</div>
+        <div class="tiny">${tiny}</div>
+      </a>
+    `;
+          }).join('');
 
-app.innerHTML = `
-<h1>Exercises</h1>
-<div class="grid fade">${tiles}</div>
-`;
-}
+          app.innerHTML = `
+    <h1>Exercises</h1>
+    <div class="grid fade">${tiles}</div>
+  `;
+      }
 
-/* ---------- DETAIL ---------- */
-function renderDetail(id) {
-const ex = EXERCISES.find(e => e.id === id);
-if (!ex) { location.hash = ""; return; }
+      /* ---------- DETAIL (pannable chart, reversed direction) ---------- */
+      function renderDetail(id) {
+          const ex = EXERCISES.find(e => e.id === id);
+          if (!ex) { location.hash = ""; return; }
 
-const date = todayStr();
-const k = keysFor(id, date);
-const count = parseInt(localStorage.getItem(k.count) || "0", 10);
-const notes = localStorage.getItem(k.notes) || "";
+          const date = todayStr();
+          const k = keysFor(id, date);
+          const count = parseInt(localStorage.getItem(k.count) || "0", 10);
+          const notes = localStorage.getItem(k.notes) || "";
 
-document.title = `${ex.name}`;
+          document.title = `${ex.name}`;
 
-const controlsHtml = ex.binary
-? `
-<div class="checkline">
-  <label style="display:flex;align-items:center;gap:10px;">
-    <input id="done" type="checkbox" ${(!isNaN(count) && count>0) ? 'checked' : ''}>
-    <span>Done for this day</span>
-  </label>
-  <div class="muted" style="margin-left:auto">✓/✗</div>
-</div>`
-: `
-<div class="stepper" style="margin-top:12px;">
-  <button class="btn" id="minus" aria-label="decrease">–</button>
-  <div class="count" id="count" role="status" aria-live="polite">${isNaN(count)?0:count}</div>
-  <button class="btn" id="plus" aria-label="increase">+</button>
-  <div class="muted" style="margin-left:auto">${ex.unit}</div>
-</div>`;
+          app.innerHTML = `
+    <a class="back" href="#">← All exercises</a>
+    <div class="card fade">
+      <div class="row">
+        <h1 style="margin:0">${ex.emoji} ${ex.name}</h1>
+        <div class="muted">
+          <label for="day" style="display:block;margin:0 0 4px;">Date</label>
+          <input id="day" type="date" value="${date}">
+        </div>
+      </div>
 
-app.innerHTML = `
-<a class="back" href="#">← All exercises</a>
-<div class="card fade">
-  <div class="row">
-    <h1 style="margin:0">${ex.emoji} ${ex.name}</h1>
-    <div class="muted">
-      <label for="day" style="display:block;margin:0 0 4px;">Date</label>
-      <input id="day" type="date" value="${date}">
-    </div>
-  </div>
+      <div class="stepper" style="margin-top:12px;">
+        <button class="btn" id="minus" aria-label="decrease">–</button>
+        <div class="count" id="count" role="status" aria-live="polite">${isNaN(count)?0:count}</div>
+        <button class="btn" id="plus" aria-label="increase">+</button>
+        <div class="muted" style="margin-left:auto">${ex.unit}</div>
+      </div>
 
-  ${controlsHtml}
+      <label for="notes">Notes (optional)</label>
+      <input id="notes" type="text" placeholder="sets × reps, comments" value="${esc(notes)}">
+      <div class="note" id="status">Saved</div>
 
-  <label for="notes">Notes (optional)</label>
-  <input id="notes" type="text" placeholder="sets × reps, comments" value="${esc(notes)}">
-  <div class="note" id="status">Saved</div>
+      <div class="chart-wrap">
+        <div class="muted" id="rangeLabel" style="margin:0 0 8px;"></div>
+        <canvas id="chart" width="600" height="200"></canvas>
+      </div>
+    </div>`;
 
-  <div class="chart-wrap">
-    <div class="muted" id="rangeLabel" style="margin:0 0 8px;"></div>
-    <canvas id="chart" width="600" height="200"></canvas>
-  </div>
-</div>`;
+          // --- wiring ---
+          const $count  = document.getElementById('count');
+          const $minus  = document.getElementById('minus');
+          const $plus   = document.getElementById('plus');
+          const $notes  = document.getElementById('notes');
+          const $status = document.getElementById('status');
+          const $day    = document.getElementById('day');
+          const $chart  = document.getElementById('chart');
+          const $label  = document.getElementById('rangeLabel');
 
-// --- wiring ---
-const $notes  = document.getElementById('notes');
-const $status = document.getElementById('status');
-const $day    = document.getElementById('day');
-const $chart  = document.getElementById('chart');
-const $label  = document.getElementById('rangeLabel');
+          const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
 
-const $count  = ex.binary ? null : document.getElementById('count');
-const $plus   = ex.binary ? null : document.getElementById('plus');
-const $minus  = ex.binary ? null : document.getElementById('minus');
-const $done   = ex.binary ? document.getElementById('done') : null;
+          function storage(dateStr) { return keysFor(id, dateStr); }
+          function loadFor(dateStr) {
+              const kk = storage(dateStr);
+              const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
+              const n = localStorage.getItem(kk.notes) || "";
+              $count.textContent = isNaN(c) ? 0 : c;
+              $notes.value = n;
+              showSaved();
+              computeBounds();
+              drawHistory();
+          }
+          function saveCount(dateStr, n) {
+              localStorage.setItem(storage(dateStr).count, String(n));
+              showSaved();
+              computeBounds();
+              drawHistory();
+          }
+          function saveNotes(dateStr, v) {
+              localStorage.setItem(storage(dateStr).notes, v);
+              showSaved();
+          }
 
-const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
+          $plus.addEventListener('click', () => {
+              const n = parseInt($count.textContent,10) + 1;
+              $count.textContent = n; saveCount($day.value, n);
+          }, {passive:true});
 
-function storage(dateStr) { return keysFor(id, dateStr); }
-function saveCount(dateStr, n) {
-const v = ex.binary ? (n > 0 ? 1 : 0) : n; // normalize to 0/1 for binary
-localStorage.setItem(storage(dateStr).count, String(v));
-showSaved();
-computeBounds();
-drawHistory();
-}
-function saveNotes(dateStr, v) {
-localStorage.setItem(storage(dateStr).notes, v);
-showSaved();
-}
-function loadFor(dateStr) {
-const kk = storage(dateStr);
-const cRaw = parseInt(localStorage.getItem(kk.count) || "0", 10);
-const c = ex.binary ? (isNaN(cRaw) ? 0 : (cRaw > 0 ? 1 : 0)) : (isNaN(cRaw) ? 0 : cRaw);
-const n = localStorage.getItem(kk.notes) || "";
-if (ex.binary) { $done.checked = c > 0; } else { $count.textContent = c; }
-$notes.value = n;
-showSaved();
-computeBounds();
-drawHistory();
-}
+          $minus.addEventListener('click', () => {
+              const n = Math.max(0, parseInt($count.textContent,10) - 1);
+              $count.textContent = n; saveCount($day.value, n);
+          }, {passive:true});
 
-if (ex.binary) {
-$done.addEventListener('change', () => {
-saveCount($day.value, $done.checked ? 1 : 0);
-}, {passive:true});
-} else {
-$plus.addEventListener('click', () => {
-const n = parseInt($count.textContent,10) + 1;
-$count.textContent = n; saveCount($day.value, n);
-}, {passive:true});
-$minus.addEventListener('click', () => {
-const n = Math.max(0, parseInt($count.textContent,10) - 1);
-$count.textContent = n; saveCount($day.value, n);
-}, {passive:true});
-}
+          let t; $notes.addEventListener('input', (e) => {
+              clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
+          });
 
-let t; $notes.addEventListener('input', (e) => {
-clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
-});
+          $day.addEventListener('change', () => loadFor($day.value));
 
-$day.addEventListener('change', () => loadFor($day.value));
+          // --- history window + panning state ---
+          let earliest = todayStr();
+          let latest = todayStr();
+          let maxOffsetDays = 0;
+          let offsetDays = 0;   // 0 = window ends today; larger = older window
+          let pxPerDay = 8;
 
-// --- history window + panning state ---
-let earliest = todayStr();
-let latest = todayStr();
-let maxOffsetDays = 0;
-let offsetDays = 0;   // 0 = window ends today; larger = older window
-let pxPerDay = 8;
+          function computeBounds() {
+              let minDS = todayStr(), hasAny = false;
+              for (let i=0;i<localStorage.length;i++) {
+                  const k = localStorage.key(i);
+                  if (!k) continue;
+                  const ds = parseDateKey(k, id);
+                  if (ds) { hasAny = true; if (ds < minDS) minDS = ds; }
+              }
+              const today = todayStr();
+              earliest = hasAny ? minDS : today;
+              latest = today;
+              maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
+              offsetDays = clamp(offsetDays, 0, maxOffsetDays);
+          }
 
-function computeBounds() {
-let minDS = todayStr(), hasAny = false;
-for (let i=0;i<localStorage.length;i++) {
-					const k = localStorage.key(i);
-					if (!k) continue;
-					const ds = parseDateKey(k, id);
-					if (ds) { hasAny = true; if (ds < minDS) minDS = ds; }
-									  }
-									  const today = todayStr();
-									  earliest = hasAny ? minDS : today;
-									  latest = today;
-									  maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
-									  offsetDays = clamp(offsetDays, 0, maxOffsetDays);
-									  }
+          function getHistoryWindow(endISO, days) {
+              const end = new Date(endISO);
+              const start = addDays(end, -(days-1));
+              const labels = [];
+              const values = [];
+              for (let i=0;i<days;i++) {
+                  const d = addDays(start, i);
+                  const ds = isoDate(d);
+                  const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+                  labels.push(ds.slice(5)); // MM-DD
+                  values.push(isNaN(v)?0:v);
+              }
+              return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
+          }
 
-									  function getHistoryWindow(endISO, days) {
-									  const end = new Date(endISO);
-									  const start = addDays(end, -(days-1));
-									  const labels = [];
-									  const values = [];
-									  for (let i=0;i<days;i++) {
-												   const d = addDays(start, i);
-												   const ds = isoDate(d);
-												   const vRaw = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-												   const v = ex.binary
-												   ? (isNaN(vRaw) ? 0 : (vRaw > 0 ? 1 : 0))  // legacy >0 → 1
-					: (isNaN(vRaw) ? 0 : vRaw);
-					labels.push(ds.slice(5)); // MM-DD
-					values.push(v);
-					}
-					return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
-					}
+          // --- drawing ---
+          function drawHistory() {
+              const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
+              const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
 
-					// --- drawing ---
-					function drawHistory() {
-					const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
-					const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
+              const dpr = window.devicePixelRatio || 1;
+              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
+              $chart.width = Math.round(cssW * dpr);
+              $chart.height = Math.round(cssH * dpr);
 
-					const dpr = window.devicePixelRatio || 1;
-					const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
-					$chart.width = Math.round(cssW * dpr);
-					$chart.height = Math.round(cssH * dpr);
+              const ctx = $chart.getContext('2d');
+              ctx.setTransform(dpr,0,0,dpr,0,0);
+              ctx.clearRect(0,0,cssW,cssH);
 
-					const ctx = $chart.getContext('2d');
-					ctx.setTransform(dpr,0,0,dpr,0,0);
-					ctx.clearRect(0,0,cssW,cssH);
+              const pad = { l: 32, r: 8, t: 8, b: 24 };
+              const w = cssW - pad.l - pad.r;
+              const h = cssH - pad.t - pad.b;
+              const maxV = Math.max(5, ...values);
+              const barGap = 6;
+              const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
+              pxPerDay = w / WINDOW_DAYS;
 
-					const pad = { l: 32, r: 8, t: 8, b: 24 };
-					const w = cssW - pad.l - pad.r;
-					const h = cssH - pad.t - pad.b;
-					const maxV = ex.binary ? 1 : Math.max(5, ...values);
-					const barGap = 6;
-					const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
-					pxPerDay = w / WINDOW_DAYS;
+              // axes
+              ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pad.l, pad.t);
+              ctx.lineTo(pad.l, pad.t + h);
+              ctx.lineTo(pad.l + w, pad.t + h);
+              ctx.stroke();
 
-					// axes
-					ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-					ctx.lineWidth = 1;
-					ctx.beginPath();
-					ctx.moveTo(pad.l, pad.t);
-					ctx.lineTo(pad.l, pad.t + h);
-					ctx.lineTo(pad.l + w, pad.t + h);
-					ctx.stroke();
+              // y ticks
+              ctx.fillStyle = 'rgba(255,255,255,0.6)';
+              ctx.font = '12px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('0', pad.l - 6, pad.t + h);
+              ctx.fillText(String(maxV), pad.l - 6, pad.t);
 
-					// y ticks
-					ctx.fillStyle = 'rgba(255,255,255,0.6)';
-					ctx.font = '12px -apple-system, system-ui, Arial';
-					ctx.textAlign = 'right';
-					ctx.textBaseline = 'middle';
-					ctx.fillText('0', pad.l - 6, pad.t + h);
-					ctx.fillText(String(maxV), pad.l - 6, pad.t);
+              // bars
+              const startX = pad.l;
+              ctx.fillStyle = '#6ea8fe';
+              for (let i = 0; i < values.length; i++) {
+                  const v = values[i];
+                  const x = startX + i * (barW + barGap);
+                  const bh = (v / maxV) * h;
+                  const y = pad.t + h - bh;
+                  ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
+              }
 
-					// bars
-					const startX = pad.l;
-					ctx.fillStyle = '#6ea8fe';
-					for (let i = 0; i < values.length; i++) {
-							    const v = values[i];
-							    const x = startX + i * (barW + barGap);
-							    const bh = (v / maxV) * h;
-							    const y = pad.t + h - (ex.binary ? (v>0 ? h : 0) : bh); // snap full height for 1
-					const hh = ex.binary ? (v>0 ? h : 0) : bh;
-  ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(hh));
-  }
+              // x labels (sparse)
+              ctx.fillStyle = 'rgba(255,255,255,0.6)';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+              const step = Math.max(1, Math.ceil(labels.length / 5));
+              for (let i = 0; i < labels.length; i += step) {
+                  const x = startX + i * (barW + barGap) + barW / 2;
+                  ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
+              }
 
-  // x labels (sparse)
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  const step = Math.max(1, Math.ceil(labels.length / 5));
-  for (let i = 0; i < labels.length; i += step) {
-                      const x = startX + i * (barW + barGap) + barW / 2;
-                      ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
-		      }
+              // range label — hint removed
+              $label.textContent = `${startISO} → ${eISO}`;
+          }
 
-		      $label.textContent = `${startISO} → ${eISO}`;
-		      }
+          // --- interactions (reversed direction) ---
+          let dragging = false;
+          let startX = 0;
 
-		      // --- interactions (reversed direction) ---
-		      let dragging = false;
-		      let startX = 0;
+          $chart.addEventListener('pointerdown', (e) => {
+              dragging = true;
+              startX = e.clientX;
+              $chart.setPointerCapture(e.pointerId);
+              $chart.style.cursor = 'grabbing';
+          });
+          $chart.addEventListener('pointermove', (e) => {
+              if (!dragging) return;
+              const dx = e.clientX - startX;
+              const deltaDays = Math.round(dx / pxPerDay);
+              if (deltaDays !== 0) {
+                  // reversed vs earlier version
+                  offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
+                  startX += deltaDays * pxPerDay;
+                  drawHistory();
+              }
+          });
+          function endDrag(e){
+              if (!dragging) return;
+              dragging = false;
+              $chart.style.cursor = 'grab';
+              try { $chart.releasePointerCapture(e.pointerId); } catch {}
+          }
+          $chart.addEventListener('pointerup', endDrag);
+          $chart.addEventListener('pointercancel', endDrag);
+          $chart.addEventListener('pointerleave', endDrag);
 
-		      $chart.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    startX = e.clientX;
-    $chart.setPointerCapture(e.pointerId);
-    $chart.style.cursor = 'grabbing';
-    });
-    $chart.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    const deltaDays = Math.round(dx / pxPerDay);
-    if (deltaDays !== 0) {
-    offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
-    startX += deltaDays * pxPerDay;
-    drawHistory();
-    }
-    });
-    function endDrag(e){
-    if (!dragging) return;
-    dragging = false;
-    $chart.style.cursor = 'grab';
-    try { $chart.releasePointerCapture(e.pointerId); } catch {}
-    }
-    $chart.addEventListener('pointerup', endDrag);
-    $chart.addEventListener('pointercancel', endDrag);
-    $chart.addEventListener('pointerleave', endDrag);
+          // Wheel (Shift for horizontal on many systems). Reversed mapping.
+          $chart.addEventListener('wheel', (e) => {
+              e.preventDefault();
+              const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+              offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
+              drawHistory();
+          }, {passive:false});
 
-    // Wheel (Shift for horizontal on many systems). Reversed mapping.
-    $chart.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
-    drawHistory();
-    }, {passive:false});
+          // Keyboard: ← newer, → older (reversed from earlier)
+          const onKey = (e) => {
+              if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+              if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+          };
+          document.addEventListener('keydown', onKey);
 
-    // Keyboard: ← newer, → older
-    const onKey = (e) => {
-    if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
-    if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
-    };
-    document.addEventListener('keydown', onKey);
+          // init
+          computeBounds();
+          drawHistory();
+          addEventListener('resize', drawHistory, {passive:true});
 
-    // init
-    computeBounds();
-    drawHistory();
-    addEventListener('resize', drawHistory, {passive:true});
+          (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
+      }
 
-    (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
-    }
-
-    /* ---------- ROUTER ---------- */
-    function route() {
-    const id = location.hash.replace(/^#/, '');
-    if (id) renderDetail(id); else renderHome();
-    }
-    addEventListener('hashchange', route, {passive:true});
-    route();
-</script>
-</body>
+      /* ---------- ROUTER ---------- */
+      function route() {
+          const id = location.hash.replace(/^#/, '');
+          if (id) renderDetail(id); else renderHome();
+      }
+      addEventListener('hashchange', route, {passive:true});
+      route();
+    </script>
+  </body>
 </html>
