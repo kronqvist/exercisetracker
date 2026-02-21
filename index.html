@@ -43,6 +43,13 @@
       .toolbar-btn { border:0; border-radius:10px; padding:10px 16px; background:#1f2030; color:#fff; font-size:14px; cursor:pointer; transition: transform .1s ease, background .2s ease; }
       .toolbar-btn:hover { background:#2a2b4f; }
       .toolbar-btn:active { transform: scale(0.97); }
+      .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap:10px; margin-top:14px; }
+      .stat { background:#10111d; border:1px solid #2a2b3f; border-radius:10px; padding:12px; text-align:center; }
+      .stat-val { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
+      .stat-label { font-size:11px; opacity:.6; margin-top:4px; }
+      .stat-arrow-up { color:#4ade80; }
+      .stat-arrow-down { color:#f87171; }
+      .stat-arrow-same { color:#9aa1ff; }
       .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
       .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -54,30 +61,34 @@
     <script>
       /* ====== CONFIG: your back-friendly exercise set ====== */
       const EXERCISES = [
-          /* Stretches */
-	  {id:"low-trunk-rotation", name:"Low Trunk Rotation",               emoji:"🔁", unit:"sec"},
-          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", emoji:"🦵", unit:"sec"},
-          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         emoji:"🧘", unit:"sec"},
-          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      emoji:"🧘", unit:"sec"},
+          /* Stretches — daily: neural tone resets overnight, no tissue damage */
+	  {id:"low-trunk-rotation", name:"Low Trunk Rotation",               emoji:"🔁", unit:"sec",  dpw:7},
+          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", emoji:"🦵", unit:"sec",  dpw:7},
+          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         emoji:"🧘", unit:"sec",  dpw:7},
+          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      emoji:"🧘", unit:"sec",  dpw:7},
 
-          /* Exercises */
-          {id:"side-plank",         name:"Side Plank",           emoji:"🧱", unit:"sec"},
-          {id:"bird-dog",           name:"Bird-Dog",             emoji:"🐶", unit:"reps"},
-          {id:"mcgill-curlup",      name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps"},
-          {id:"dead-bug",           name:"Dead Bug",             emoji:"🪲", unit:"reps"},
-          {id:"suitcase-carry",     name:"Suitcase Carry",       emoji:"🧳", unit:"sec"},
-          {id:"glute-bridge",       name:"Glute Bridge",         emoji:"🌉", unit:"reps"},
-          {id:"clamshell",          name:"Clamshell",            emoji:"🐚", unit:"reps"},
-          {id:"cat-camel",          name:"Cat–Camel",            emoji:"🐈", unit:"reps"},
-          {id:"draken",             name:"Draken",               emoji:"🐉", unit:"reps"},
-          {id:"prone-flutter-kick", name:"Prone Flutter Kick",  emoji:"🏊", unit:"sec"},
-          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps"},
-          {id:"rubber-band-row",    name:"Rubber Band Row",      emoji:"🚣", unit:"reps"},
-          {id:"running",            name:"Running",              emoji:"🏃", unit:"100m"},
-          {id:"swimming",           name:"Swimming",             emoji:"🏊", unit:"100m"},
-          {id:"skiing",             name:"Skiing",               emoji:"⛷️", unit:"km"},
-          {id:"pushups",            name:"Push-Ups",             emoji:"🤸", unit:"reps"},
-          {id:"pullups",            name:"Pull-Ups",             emoji:"🧗", unit:"reps"}
+          /* Motor control — daily: neural pattern training, not strength */
+          {id:"side-plank",         name:"Side Plank",           emoji:"🧱", unit:"sec",  dpw:7},
+          {id:"bird-dog",           name:"Bird-Dog",             emoji:"🐶", unit:"reps", dpw:7},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps", dpw:7},
+          {id:"dead-bug",           name:"Dead Bug",             emoji:"🪲", unit:"reps", dpw:7},
+          {id:"cat-camel",          name:"Cat–Camel",            emoji:"🐈", unit:"reps", dpw:7},
+
+          /* Rehab strengthening — 5x/week: low-load but benefits from recovery */
+          {id:"suitcase-carry",     name:"Suitcase Carry",       emoji:"🧳", unit:"sec",  dpw:5},
+          {id:"glute-bridge",       name:"Glute Bridge",         emoji:"🌉", unit:"reps", dpw:5},
+          {id:"clamshell",          name:"Clamshell",            emoji:"🐚", unit:"reps", dpw:5},
+          {id:"draken",             name:"Draken",               emoji:"🐉", unit:"reps", dpw:5},
+          {id:"prone-flutter-kick", name:"Prone Flutter Kick",  emoji:"🏊", unit:"sec",  dpw:5},
+          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps", dpw:5},
+          {id:"rubber-band-row",    name:"Rubber Band Row",      emoji:"🚣", unit:"reps", dpw:5},
+
+          /* Strength & conditioning — 3x/week: needs 48-72h recovery */
+          {id:"running",            name:"Running",              emoji:"🏃", unit:"100m", dpw:3},
+          {id:"swimming",           name:"Swimming",             emoji:"🏊", unit:"100m", dpw:3},
+          {id:"skiing",             name:"Skiing",               emoji:"⛷️", unit:"km",   dpw:3},
+          {id:"pushups",            name:"Push-Ups",             emoji:"🤸", unit:"reps", dpw:3},
+          {id:"pullups",            name:"Pull-Ups",             emoji:"🧗", unit:"reps", dpw:3}
       ];
 
       const WINDOW_DAYS = 14; // visible window size
@@ -179,6 +190,20 @@
       function getAllTimeTotal(id) {
           const data = getAllDataForExercise(id);
           return Object.values(data).reduce((s, v) => s + v, 0);
+      }
+
+      function getWeekDays(id, weeksAgo) {
+          const today = new Date(todayStr());
+          const dow = today.getUTCDay();
+          const endOfWeek = addDays(today, -dow - (weeksAgo * 7));
+          const startOfWeek = addDays(endOfWeek, -6);
+          let days = 0;
+          for (let i = 0; i < 7; i++) {
+              const ds = isoDate(addDays(startOfWeek, i));
+              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+              if (v > 0) days++;
+          }
+          return days;
       }
 
       /* ====== EXPORT / IMPORT ====== */
@@ -315,6 +340,8 @@
         <div class="muted" id="rangeLabel" style="margin:0 0 8px;"></div>
         <canvas id="chart" width="600" height="200"></canvas>
       </div>
+
+      <div class="stats" id="stats"></div>
     </div>`;
 
           // --- wiring ---
@@ -326,8 +353,27 @@
           const $day    = document.getElementById('day');
           const $chart  = document.getElementById('chart');
           const $label  = document.getElementById('rangeLabel');
+          const $stats  = document.getElementById('stats');
 
           const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
+
+          function updateStats() {
+              const streak = getStreak(id);
+              const thisWeek = getWeekTotal(id, 0);
+              const lastWeek = getWeekTotal(id, 1);
+              const total = getAllTimeTotal(id);
+              const weekDays = getWeekDays(id, 0);
+              const diff = thisWeek - lastWeek;
+              const arrow = diff > 0 ? '<span class="stat-arrow-up">&#9650;</span>' : diff < 0 ? '<span class="stat-arrow-down">&#9660;</span>' : '<span class="stat-arrow-same">&#9654;</span>';
+              const freqLabel = ex.dpw === 7 ? 'daily' : `${ex.dpw}x/wk`;
+              $stats.innerHTML = `
+                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak (days)</div></div>
+                <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
+                <div class="stat"><div class="stat-val">${weekDays}/${ex.dpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
+                <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
+                <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
+              `;
+          }
 
           function storage(dateStr) { return keysFor(id, dateStr); }
           function loadFor(dateStr) {
@@ -339,12 +385,14 @@
               showSaved();
               computeBounds();
               drawHistory();
+              updateStats();
           }
           function saveCount(dateStr, n) {
               localStorage.setItem(storage(dateStr).count, String(n));
               showSaved();
               computeBounds();
               drawHistory();
+              updateStats();
           }
           function saveNotes(dateStr, v) {
               localStorage.setItem(storage(dateStr).notes, v);
@@ -454,6 +502,24 @@
                   ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
               }
 
+              // 7-day SMA trend line
+              if (values.length >= 7) {
+                  ctx.strokeStyle = 'rgba(251,191,36,0.7)';
+                  ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  let started = false;
+                  for (let i = 6; i < values.length; i++) {
+                      let sum = 0;
+                      for (let j = i - 6; j <= i; j++) sum += values[j];
+                      const avg = sum / 7;
+                      const x = startX + i * (barW + barGap) + barW / 2;
+                      const y = pad.t + h - (avg / maxV) * h;
+                      if (!started) { ctx.moveTo(x, y); started = true; }
+                      else ctx.lineTo(x, y);
+                  }
+                  ctx.stroke();
+              }
+
               // x labels (sparse)
               ctx.fillStyle = 'rgba(255,255,255,0.6)';
               ctx.textAlign = 'center';
@@ -517,6 +583,7 @@
           // init
           computeBounds();
           drawHistory();
+          updateStats();
           addEventListener('resize', drawHistory, {passive:true});
 
           (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
