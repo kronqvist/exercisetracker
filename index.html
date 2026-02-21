@@ -39,6 +39,10 @@
       .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
       .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
       canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
+      .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+      .toolbar-btn { border:0; border-radius:10px; padding:10px 16px; background:#1f2030; color:#fff; font-size:14px; cursor:pointer; transition: transform .1s ease, background .2s ease; }
+      .toolbar-btn:hover { background:#2a2b4f; }
+      .toolbar-btn:active { transform: scale(0.97); }
       .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
       .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -105,6 +109,144 @@
           return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
       }
 
+      /* ====== DATA UTILITIES (shared by analytics, export, etc.) ====== */
+      function getAllDataForExercise(id) {
+          const result = {};
+          for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (!k) continue;
+              const ds = parseDateKey(k, id);
+              if (ds) {
+                  const v = parseInt(localStorage.getItem(k) || "0", 10);
+                  if (v > 0) result[ds] = v;
+              }
+          }
+          return result;
+      }
+
+      function getAllData() {
+          const result = {};
+          for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (!k || !k.startsWith('ex:')) continue;
+              result[k] = localStorage.getItem(k);
+          }
+          return result;
+      }
+
+      function getStreak(id) {
+          const data = getAllDataForExercise(id);
+          const today = todayStr();
+          let current = 0, best = 0, run = 0;
+          // Walk backwards from today
+          let d = today;
+          // Allow streak to start from today or yesterday
+          const todayVal = data[today] || 0;
+          const yesterdayVal = data[isoDate(addDays(new Date(today), -1))] || 0;
+          if (todayVal === 0 && yesterdayVal === 0) { return { current: 0, best: 0 }; }
+          const startOffset = todayVal > 0 ? 0 : 1;
+          for (let i = startOffset; i < 3650; i++) {
+              const ds = isoDate(addDays(new Date(today), -i));
+              if (data[ds]) { current++; } else { break; }
+          }
+          // Best streak: scan all dates sorted
+          const dates = Object.keys(data).sort();
+          for (let i = 0; i < dates.length; i++) {
+              if (i === 0 || daysBetween(dates[i-1], dates[i]) === 1) {
+                  run++;
+              } else {
+                  run = 1;
+              }
+              if (run > best) best = run;
+          }
+          return { current, best };
+      }
+
+      function getWeekTotal(id, weeksAgo) {
+          const today = new Date(todayStr());
+          const dow = today.getUTCDay(); // 0=Sun
+          const endOfWeek = addDays(today, -dow - (weeksAgo * 7));
+          const startOfWeek = addDays(endOfWeek, -6);
+          let total = 0;
+          for (let i = 0; i < 7; i++) {
+              const ds = isoDate(addDays(startOfWeek, i));
+              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+              if (!isNaN(v)) total += v;
+          }
+          return total;
+      }
+
+      function getAllTimeTotal(id) {
+          const data = getAllDataForExercise(id);
+          return Object.values(data).reduce((s, v) => s + v, 0);
+      }
+
+      /* ====== EXPORT / IMPORT ====== */
+      function exportData() {
+          const data = getAllData();
+          const payload = {
+              version: 1,
+              exported: new Date().toISOString(),
+              entries: Object.keys(data).length,
+              data: data
+          };
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `exercises-backup-${todayStr()}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+      }
+
+      function importData() {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = '.json';
+          input.addEventListener('change', () => {
+              const file = input.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                  try {
+                      const payload = JSON.parse(reader.result);
+                      if (!payload.data || typeof payload.data !== 'object') {
+                          alert('Invalid backup file: missing data.');
+                          return;
+                      }
+                      const keys = Object.keys(payload.data).filter(k => k.startsWith('ex:'));
+                      if (keys.length === 0) {
+                          alert('No exercise data found in file.');
+                          return;
+                      }
+                      // Count new vs existing
+                      let newCount = 0, overwriteCount = 0;
+                      for (const k of keys) {
+                          const existing = localStorage.getItem(k);
+                          if (existing === null) newCount++;
+                          else if (existing !== payload.data[k]) overwriteCount++;
+                      }
+                      let msg = `Found ${keys.length} entries.\n\n`;
+                      msg += `  ${newCount} new entries will be added.\n`;
+                      if (overwriteCount > 0) {
+                          msg += `  ${overwriteCount} existing entries differ and will be OVERWRITTEN.\n`;
+                      }
+                      msg += `\nProceed?`;
+                      if (!confirm(msg)) return;
+                      for (const k of keys) {
+                          localStorage.setItem(k, payload.data[k]);
+                      }
+                      alert(`Imported ${keys.length} entries.`);
+                      route(); // re-render
+                  } catch (e) {
+                      alert('Failed to read backup file: ' + e.message);
+                  }
+              };
+              reader.readAsText(file);
+          });
+          input.click();
+      }
+
       /* ---------- HOME ---------- */
       function renderHome() {
           document.title = "Exercises";
@@ -125,8 +267,14 @@
 
           app.innerHTML = `
     <h1>Exercises</h1>
+    <div class="toolbar">
+      <button class="toolbar-btn" id="btn-export">Export Backup</button>
+      <button class="toolbar-btn" id="btn-import">Import Backup</button>
+    </div>
     <div class="grid fade">${tiles}</div>
   `;
+          document.getElementById('btn-export').addEventListener('click', exportData);
+          document.getElementById('btn-import').addEventListener('click', importData);
       }
 
       /* ---------- DETAIL (pannable chart, reversed direction) ---------- */
