@@ -18,7 +18,7 @@
         --bg:#0c0c14; --card:#151520; --card-border:#1e1e30;
         --text:#e8e8f0; --text-muted:rgba(232,232,240,.55);
         --accent:#818cf8;
-        --clr-stretch:#f59e0b; --clr-motor:#818cf8; --clr-rehab:#34d399; --clr-cond:#fb7185;
+        --clr-stretch:#f59e0b; --clr-motor:#818cf8; --clr-rehab:#38bdf8; --clr-cond:#fb7185;
         --done-glow:rgba(74,222,128,.12);
         font-family: -apple-system, system-ui, "SF Pro Display", "SF Pro Text", Arial, sans-serif;
       }
@@ -122,7 +122,7 @@
           /* Motor control — daily: neural pattern training, not strength */
           {id:"side-plank",         name:"Side Plank",           unit:"sec",  dpw:7, clr:"motor"},
           {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", dpw:7, clr:"motor"},
-          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"reps", dpw:7, clr:"motor"},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  dpw:7, clr:"motor"},
           {id:"dead-bug",           name:"Dead Bug",             unit:"reps", dpw:7, clr:"motor"},
           {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", dpw:7, clr:"motor"},
 
@@ -257,6 +257,29 @@
           return days;
       }
 
+      /* ====== ON-TRACK LOGIC ====== */
+      function getCurrentWeekProgress(id) {
+          const today = new Date(todayStr());
+          const dow = today.getUTCDay(); // 0=Sun
+          const daysSinceMonday = dow === 0 ? 6 : dow - 1; // Mon=0..Sun=6
+          let days = 0;
+          for (let i = 0; i <= daysSinceMonday; i++) {
+              const ds = isoDate(addDays(today, -daysSinceMonday + i));
+              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+              if (v > 0) days++;
+          }
+          return { done: days, elapsed: daysSinceMonday + 1 };
+      }
+
+      function isOnTrack(id, dpw) {
+          if (dpw === 7) {
+              return parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10) > 0;
+          }
+          const { done, elapsed } = getCurrentWeekProgress(id);
+          const needed = Math.floor(dpw * elapsed / 7);
+          return done >= needed;
+      }
+
       /* ====== EXPORT / IMPORT ====== */
       function exportData() {
           const data = getAllData();
@@ -345,7 +368,7 @@
               }
               const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
               const c = isNaN(count) ? 0 : count;
-              const done = c > 0;
+              const done = isOnTrack(x.id, x.dpw);
               html += `
       <a class="tile${done?' done':''}" href="#${x.id}" aria-label="${x.name}" style="--tile-accent:${CLR_MAP[x.clr]}">
         <span style="color:${CLR_MAP[x.clr]}">${ICONS[x.id] || ''}</span>
