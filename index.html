@@ -272,9 +272,9 @@
       }
 
       function isOnTrack(id, dpw) {
-          if (dpw === 7) {
-              return parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10) > 0;
-          }
+          const doneToday = parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10) > 0;
+          if (doneToday) return true;
+          if (dpw === 7) return false;
           const { done, elapsed } = getCurrentWeekProgress(id);
           const needed = Math.floor(dpw * elapsed / 7);
           return done >= needed;
