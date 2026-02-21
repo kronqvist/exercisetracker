@@ -27,6 +27,7 @@ Overcome the biomechanical issues described above and become overall stronger. A
 
 - **No changes are allowed that would overwrite existing user data.** All data in localStorage is irreplaceable. Any feature that writes to localStorage must preserve existing entries. Import/merge operations must confirm with the user before touching any key that already has a value.
 - **Every change must bump the version number** in `service-worker.js` (`APP_VERSION` constant). This ensures the PWA cache is invalidated and users get the latest version.
+- **Summary format:** When done with a change, format the summary like a git commit — a short title line (imperative mood, under 70 chars) followed by a body describing what changed and why.
 
 ## Technical Notes
 

@@ -13,44 +13,72 @@
     </script>
 
     <style>
-      :root { --gap:16px; --r:14px; font-family: -apple-system, system-ui, "SF Pro Text", Arial, sans-serif; }
-      body { margin:0; background:#0b0b0f; color:#fff; }
-      .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),24px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),24px); }
-      h1 { margin:0 0 14px; font-size:22px; }
-      .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: var(--gap); }
-      .tile { background:#14141c; border-radius: var(--r); padding:18px; text-align:center; color:#fff; text-decoration:none;
-              box-shadow: 0 10px 30px rgba(0,0,0,.35); transition: transform .08s ease; }
-      .tile:active { transform: scale(.98); }
-      .emoji { font-size:42px; display:block; margin-bottom:8px; }
-      .sub { opacity:.75; font-size:12px; margin-top:4px; }
-      .tiny { opacity:.6; font-size:12px; margin-top:6px; }
+      :root {
+        --gap:14px; --r:16px;
+        --bg:#0c0c14; --card:#151520; --card-border:#1e1e30;
+        --text:#e8e8f0; --text-muted:rgba(232,232,240,.55);
+        --accent:#818cf8;
+        --clr-stretch:#f59e0b; --clr-motor:#818cf8; --clr-rehab:#34d399; --clr-cond:#fb7185;
+        --done-glow:rgba(74,222,128,.12);
+        font-family: -apple-system, system-ui, "SF Pro Display", "SF Pro Text", Arial, sans-serif;
+      }
+      * { box-sizing:border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); }
+      .wrap { padding: max(env(safe-area-inset-top),24px) max(env(safe-area-inset-right),20px) max(env(safe-area-inset-bottom),24px) max(env(safe-area-inset-left),20px);
+              max-width:720px; margin:0 auto; }
+      h1 { margin:0 0 6px; font-size:24px; font-weight:700; letter-spacing:-.3px; }
+      h2.section { margin:20px 0 10px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:1.2px; color:var(--text-muted); }
 
-      .card { max-width: 560px; margin: 0 auto; background:#14141c; border-radius: var(--r); padding:22px; box-shadow:0 10px 30px rgba(0,0,0,.35); }
-      .back { display:inline-block; margin-bottom:14px; color:#9aa1ff; text-decoration:none; }
+      /* --- Grid & Tiles --- */
+      .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: var(--gap); }
+      .tile { background:var(--card); border-radius: var(--r); padding:20px 14px 16px; text-align:center; color:var(--text); text-decoration:none;
+              border:1px solid var(--card-border); border-left:3px solid var(--tile-accent, var(--card-border));
+              transition: transform .1s ease, box-shadow .25s ease, border-color .25s ease; position:relative; }
+      .tile:active { transform: scale(.97); }
+      .tile.done { border-left-color: #4ade80; box-shadow: 0 0 20px var(--done-glow), 0 4px 16px rgba(0,0,0,.3); }
+      .tile.done .tile-icon { opacity:1; }
+      .tile-icon { width:36px; height:36px; margin:0 auto 10px; display:block; opacity:.75; transition:opacity .2s; }
+      .tile-name { font-size:13px; font-weight:600; line-height:1.3; }
+      .tile-unit { font-size:11px; color:var(--text-muted); margin-top:3px; }
+      .tile-today { font-size:11px; margin-top:6px; font-variant-numeric:tabular-nums; color:var(--text-muted); }
+      .tile.done .tile-today { color:#4ade80; }
+
+      /* --- Detail Card --- */
+      .card { max-width:560px; margin:0 auto; background:var(--card); border-radius:var(--r); padding:24px; border:1px solid var(--card-border); }
+      .back { display:inline-flex; align-items:center; gap:6px; margin-bottom:14px; color:var(--accent); text-decoration:none; font-size:14px; font-weight:500; }
       .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-      .muted { opacity:.75; font-size:13px; }
-      .stepper { display:flex; align-items:center; gap:12px; margin-top: 8px; }
-      .btn { border:0; border-radius:12px; padding:14px 18px; background:#1f2030; color:#fff; font-size:20px; line-height:1; transition: transform .1s ease, background .2s ease; }
-      .btn:active { transform: scale(0.97); }
-      .count { font-variant-numeric: tabular-nums; font-size:42px; min-width: 4.5ch; text-align:center; }
-      label { display:block; margin:18px 0 6px; opacity:.85; }
-      input[type="text"] { width:100%; font-size:18px; padding:12px 14px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
-      input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid #2a2b3f; background:#0f1020; color:#fff; }
-      .note { opacity:.7; font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
-      .chart-wrap { margin-top:18px; background:#10111d; border:1px solid #2a2b3f; border-radius:12px; padding:12px; }
+      .muted { color:var(--text-muted); font-size:13px; }
+      .stepper { display:flex; align-items:center; gap:14px; margin-top:12px; }
+      .btn { border:0; border-radius:14px; padding:16px 20px; background:#1c1c2e; color:var(--text); font-size:20px; font-weight:500; line-height:1;
+             cursor:pointer; transition: transform .1s ease, background .15s ease; border:1px solid var(--card-border); }
+      .btn:hover { background:#24243a; }
+      .btn:active { transform: scale(0.95); }
+      .count { font-variant-numeric:tabular-nums; font-size:44px; font-weight:700; min-width:4.5ch; text-align:center; letter-spacing:-.5px; }
+      label { display:block; margin:20px 0 6px; font-size:13px; font-weight:500; color:var(--text-muted); }
+      input[type="text"] { width:100%; font-size:16px; padding:12px 14px; border-radius:12px; border:1px solid var(--card-border); background:var(--bg); color:var(--text); box-sizing:border-box; }
+      input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid var(--card-border); background:var(--bg); color:var(--text); }
+      .note { color:var(--text-muted); font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
+      .chart-wrap { margin-top:20px; background:var(--bg); border:1px solid var(--card-border); border-radius:14px; padding:14px; }
       canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
-      .toolbar { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
-      .toolbar-btn { border:0; border-radius:10px; padding:10px 16px; background:#1f2030; color:#fff; font-size:14px; cursor:pointer; transition: transform .1s ease, background .2s ease; }
-      .toolbar-btn:hover { background:#2a2b4f; }
+
+      /* --- Toolbar --- */
+      .toolbar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+      .toolbar-btn { border:0; border-radius:10px; padding:9px 14px; background:#1c1c2e; color:var(--text-muted); font-size:13px; font-weight:500; cursor:pointer;
+                     border:1px solid var(--card-border); transition: transform .1s ease, background .15s ease, color .15s ease; }
+      .toolbar-btn:hover { background:#24243a; color:var(--text); }
       .toolbar-btn:active { transform: scale(0.97); }
-      .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(110px,1fr)); gap:10px; margin-top:14px; }
-      .stat { background:#10111d; border:1px solid #2a2b3f; border-radius:10px; padding:12px; text-align:center; }
-      .stat-val { font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; }
-      .stat-label { font-size:11px; opacity:.6; margin-top:4px; }
+
+      /* --- Stats --- */
+      .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(100px,1fr)); gap:8px; margin-top:16px; }
+      .stat { background:var(--bg); border:1px solid var(--card-border); border-radius:12px; padding:12px 8px; text-align:center; }
+      .stat-val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.3px; }
+      .stat-label { font-size:10px; font-weight:500; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
       .stat-arrow-up { color:#4ade80; }
       .stat-arrow-down { color:#f87171; }
-      .stat-arrow-same { color:#9aa1ff; }
-      .fade { animation: fade .18s ease; } @keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+      .stat-arrow-same { color:var(--accent); }
+
+      /* --- Animations --- */
+      .fade { animation: fade .2s ease; } @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
       .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     </style>
@@ -59,42 +87,70 @@
     <div class="wrap" id="app"></div>
 
     <script>
-      /* ====== CONFIG: your back-friendly exercise set ====== */
+      /* ====== SVG ICONS ====== */
+      const _s = (d, vb='0 0 32 32') => `<svg class="tile-icon" viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+      const ICONS = {
+        "hip-flexor-stretch": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v7"/><path d="M16 15l-5 7v4"/><path d="M16 15l5 3 3-1"/><path d="M11 22h-2"/>`),
+        "hamstring-stretch": _s(`<circle cx="8" cy="20" r="3"/><path d="M8 17h10"/><path d="M18 17l6-8"/><path d="M22 9l2-2"/><path d="M8 17v-4"/>`),
+        "figure4-stretch": _s(`<circle cx="8" cy="22" r="3"/><path d="M8 19h12"/><path d="M20 19v-6"/><path d="M20 13l-5 3"/><path d="M15 16l5 3"/>`),
+        "side-plank": _s(`<circle cx="24" cy="8" r="3"/><path d="M22 10L10 20"/><path d="M10 20L4 26"/><path d="M24 11v5"/>`),
+        "bird-dog": _s(`<circle cx="12" cy="10" r="3"/><path d="M12 13v5h8v5"/><path d="M12 18h-6l-2 5"/><path d="M12 13l8-4"/><path d="M20 18l6 2"/>`),
+        "mcgill-curlup": _s(`<circle cx="14" cy="15" r="3"/><path d="M14 18l-8 2"/><path d="M6 20h20"/><path d="M26 20l-2-5"/><path d="M14 18l2 2"/>`),
+        "dead-bug": _s(`<circle cx="16" cy="18" r="3"/><path d="M16 15v-6"/><path d="M16 9l-5-4"/><path d="M16 9l5-4"/><path d="M16 21l-5 4"/><path d="M16 21l5 4"/>`),
+        "cat-camel": _s(`<path d="M4 18q6-8 12-8t12 8"/><path d="M4 18v4"/><path d="M28 18v4"/><circle cx="28" cy="14" r="2.5"/>`),
+        "suitcase-carry": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v12"/><path d="M16 20l-4 6"/><path d="M16 20l4 6"/><path d="M16 12l6 0v4h-2"/><path d="M16 12l-6 0"/>`),
+        "glute-bridge": _s(`<path d="M4 24h4l6-10 6 10h4"/><path d="M8 24v2"/><path d="M24 24v2"/><circle cx="10" cy="12" r="2"/>`),
+        "clamshell": _s(`<path d="M6 16q10-10 20 0"/><path d="M6 16q10 10 20 0"/><path d="M6 16h20"/>`),
+        "draken": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v10"/><path d="M16 18l-3 8"/><path d="M16 18l5-1"/><path d="M16 12l-6-1"/><path d="M16 12l6 2"/><path d="M21 17l3 4"/>`),
+        "hip-adduction": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v8"/><path d="M16 16l-6 8"/><path d="M16 16l6 8"/><path d="M7 20l5-1" stroke-dasharray="2 2"/><path d="M25 20l-5-1" stroke-dasharray="2 2"/>`),
+        "rubber-band-archer": _s(`<circle cx="10" cy="8" r="3"/><path d="M10 11v7"/><path d="M10 18l-4 6"/><path d="M10 18l4 6"/><path d="M10 13l14-2" stroke-dasharray="3 2"/><path d="M10 13h5"/>`),
+        "rubber-band-row": _s(`<circle cx="20" cy="8" r="3"/><path d="M20 11v7"/><path d="M20 18l-4 6"/><path d="M20 18l4 6"/><path d="M20 13l-12 0" stroke-dasharray="3 2"/><path d="M20 13l-5 0"/>`),
+        "running": _s(`<circle cx="18" cy="5" r="3"/><path d="M18 8l-2 7"/><path d="M16 15l-6 6"/><path d="M16 15l7 4"/><path d="M18 8l5 4"/><path d="M16 15l-7-2"/>`),
+        "swimming": _s(`<circle cx="8" cy="14" r="3"/><path d="M11 14h14"/><path d="M25 14l-3-4"/><path d="M8 17l4 4"/><path d="M4 22q4-3 8 0t8 0 8 0"/>`),
+        "skiing": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v8"/><path d="M16 16l-5 8"/><path d="M16 16l5 8"/><path d="M10 8l-4 12"/><path d="M22 8l4 12"/><path d="M4 26l24-4"/>`),
+        "pushups": _s(`<circle cx="8" cy="12" r="3"/><path d="M10 14l14 4"/><path d="M24 18v6"/><path d="M10 14v6"/>`),
+        "pullups": _s(`<path d="M6 4h20"/><circle cx="16" cy="9" r="3"/><path d="M13 7V4"/><path d="M19 7V4"/><path d="M16 12v6"/><path d="M16 18l-4 6"/><path d="M16 18l4 6"/>`)
+      };
+
+      /* ====== CONFIG ====== */
       const EXERCISES = [
           /* Stretches — daily: neural tone resets overnight, no tissue damage */
-          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", emoji:"🦵", unit:"sec",  dpw:7},
-          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         emoji:"🧘", unit:"sec",  dpw:7},
-          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      emoji:"🧘", unit:"sec",  dpw:7},
+          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", unit:"sec",  dpw:7, clr:"stretch"},
+          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         unit:"sec",  dpw:7, clr:"stretch"},
+          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      unit:"sec",  dpw:7, clr:"stretch"},
 
           /* Motor control — daily: neural pattern training, not strength */
-          {id:"side-plank",         name:"Side Plank",           emoji:"🧱", unit:"sec",  dpw:7},
-          {id:"bird-dog",           name:"Bird-Dog",             emoji:"🐶", unit:"reps", dpw:7},
-          {id:"mcgill-curlup",      name:"McGill Curl-Up",       emoji:"🛏️", unit:"reps", dpw:7},
-          {id:"dead-bug",           name:"Dead Bug",             emoji:"🪲", unit:"reps", dpw:7},
-          {id:"cat-camel",          name:"Cat–Camel",            emoji:"🐈", unit:"reps", dpw:7},
+          {id:"side-plank",         name:"Side Plank",           unit:"sec",  dpw:7, clr:"motor"},
+          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", dpw:7, clr:"motor"},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"reps", dpw:7, clr:"motor"},
+          {id:"dead-bug",           name:"Dead Bug",             unit:"reps", dpw:7, clr:"motor"},
+          {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", dpw:7, clr:"motor"},
 
           /* Rehab strengthening — 5x/week: low-load but benefits from recovery */
-          {id:"suitcase-carry",     name:"Suitcase Carry",       emoji:"🧳", unit:"sec",  dpw:5},
-          {id:"glute-bridge",       name:"Glute Bridge",         emoji:"🌉", unit:"reps", dpw:5},
-          {id:"clamshell",          name:"Clamshell",            emoji:"🐚", unit:"reps", dpw:5},
-          {id:"draken",             name:"Draken",               emoji:"🐉", unit:"reps", dpw:5},
-          {id:"hip-adduction",      name:"Hip Adduction",        emoji:"🦿", unit:"reps", dpw:5},
-          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", emoji:"🏹", unit:"reps", dpw:5},
-          {id:"rubber-band-row",    name:"Rubber Band Row",      emoji:"🚣", unit:"reps", dpw:5},
+          {id:"suitcase-carry",     name:"Suitcase Carry",       unit:"sec",  dpw:5, clr:"rehab"},
+          {id:"glute-bridge",       name:"Glute Bridge",         unit:"reps", dpw:5, clr:"rehab"},
+          {id:"clamshell",          name:"Clamshell",            unit:"reps", dpw:5, clr:"rehab"},
+          {id:"draken",             name:"Draken",               unit:"reps", dpw:5, clr:"rehab"},
+          {id:"hip-adduction",      name:"Hip Adduction",        unit:"reps", dpw:5, clr:"rehab"},
+          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", unit:"reps", dpw:5, clr:"rehab"},
+          {id:"rubber-band-row",    name:"Rubber Band Row",      unit:"reps", dpw:5, clr:"rehab"},
 
           /* Strength & conditioning — 3x/week: needs 48-72h recovery */
-          {id:"running",            name:"Running",              emoji:"🏃", unit:"100m", dpw:3},
-          {id:"swimming",           name:"Swimming",             emoji:"🏊", unit:"100m", dpw:3},
-          {id:"skiing",             name:"Skiing",               emoji:"⛷️", unit:"km",   dpw:3},
-          {id:"pushups",            name:"Push-Ups",             emoji:"🤸", unit:"reps", dpw:3},
-          {id:"pullups",            name:"Pull-Ups",             emoji:"🧗", unit:"reps", dpw:3}
+          {id:"running",            name:"Running",              unit:"100m", dpw:3, clr:"cond"},
+          {id:"swimming",           name:"Swimming",             unit:"100m", dpw:3, clr:"cond"},
+          {id:"skiing",             name:"Skiing",               unit:"km",   dpw:3, clr:"cond"},
+          {id:"pushups",            name:"Push-Ups",             unit:"reps", dpw:3, clr:"cond"},
+          {id:"pullups",            name:"Pull-Ups",             unit:"reps", dpw:3, clr:"cond"}
       ];
 
-      const WINDOW_DAYS = 14; // visible window size
+      const CLR_MAP = { stretch:'var(--clr-stretch)', motor:'var(--clr-motor)', rehab:'var(--clr-rehab)', cond:'var(--clr-cond)' };
+      const SECTION_LABELS = { stretch:'Stretches', motor:'Motor Control', rehab:'Rehab Strengthening', cond:'Conditioning' };
+
+      const WINDOW_DAYS = 14;
       const MS_PER_DAY = 86400000;
 
       const app = document.getElementById('app');
-      const todayStr = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD (UTC)
+      const todayStr = () => new Date().toISOString().slice(0,10);
       const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
       const isoDate = (d) => new Date(d).toISOString().slice(0,10);
@@ -148,9 +204,6 @@
           const data = getAllDataForExercise(id);
           const today = todayStr();
           let current = 0, best = 0, run = 0;
-          // Walk backwards from today
-          let d = today;
-          // Allow streak to start from today or yesterday
           const todayVal = data[today] || 0;
           const yesterdayVal = data[isoDate(addDays(new Date(today), -1))] || 0;
           if (todayVal === 0 && yesterdayVal === 0) { return { current: 0, best: 0 }; }
@@ -159,7 +212,6 @@
               const ds = isoDate(addDays(new Date(today), -i));
               if (data[ds]) { current++; } else { break; }
           }
-          // Best streak: scan all dates sorted
           const dates = Object.keys(data).sort();
           for (let i = 0; i < dates.length; i++) {
               if (i === 0 || daysBetween(dates[i-1], dates[i]) === 1) {
@@ -174,7 +226,7 @@
 
       function getWeekTotal(id, weeksAgo) {
           const today = new Date(todayStr());
-          const dow = today.getUTCDay(); // 0=Sun
+          const dow = today.getUTCDay();
           const endOfWeek = addDays(today, -dow - (weeksAgo * 7));
           const startOfWeek = addDays(endOfWeek, -6);
           let total = 0;
@@ -243,7 +295,6 @@
                           alert('No exercise data found in file.');
                           return;
                       }
-                      // Count new vs existing
                       let newCount = 0, overwriteCount = 0;
                       for (const k of keys) {
                           const existing = localStorage.getItem(k);
@@ -261,7 +312,7 @@
                           localStorage.setItem(k, payload.data[k]);
                       }
                       alert(`Imported ${keys.length} entries.`);
-                      route(); // re-render
+                      route();
                   } catch (e) {
                       alert('Failed to read backup file: ' + e.message);
                   }
@@ -276,32 +327,41 @@
           document.title = "Exercises";
           const today = todayStr();
 
-          const tiles = EXERCISES.map(x => {
-              const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
-              const tiny = `Today: ${isNaN(count)?0:count} ${x.unit}`;
-              return `
-      <a class="tile" href="#${x.id}" aria-label="${x.name}">
-        <span class="emoji">${x.emoji}</span>
-        <div>${x.name}</div>
-        <div class="sub">${x.unit}</div>
-        <div class="tiny">${tiny}</div>
-      </a>
-    `;
-          }).join('');
-
-          app.innerHTML = `
-    <h1>Exercises</h1>
+          // Group exercises by category for section headers
+          let html = `<h1>Exercises</h1>
     <div class="toolbar">
       <button class="toolbar-btn" id="btn-export">Export Backup</button>
       <button class="toolbar-btn" id="btn-import">Import Backup</button>
-    </div>
-    <div class="grid fade">${tiles}</div>
-  `;
+    </div>`;
+
+          let lastClr = null;
+          let gridOpen = false;
+          for (const x of EXERCISES) {
+              if (x.clr !== lastClr) {
+                  if (gridOpen) html += '</div>';
+                  html += `<h2 class="section" style="color:${CLR_MAP[x.clr]}">${SECTION_LABELS[x.clr]}</h2><div class="grid fade">`;
+                  gridOpen = true;
+                  lastClr = x.clr;
+              }
+              const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
+              const c = isNaN(count) ? 0 : count;
+              const done = c > 0;
+              html += `
+      <a class="tile${done?' done':''}" href="#${x.id}" aria-label="${x.name}" style="--tile-accent:${CLR_MAP[x.clr]}">
+        <span style="color:${CLR_MAP[x.clr]}">${ICONS[x.id] || ''}</span>
+        <div class="tile-name">${x.name}</div>
+        <div class="tile-unit">${x.unit}</div>
+        <div class="tile-today">${c > 0 ? c + ' ' + x.unit : '\u2014'}</div>
+      </a>`;
+          }
+          if (gridOpen) html += '</div>';
+
+          app.innerHTML = html;
           document.getElementById('btn-export').addEventListener('click', exportData);
           document.getElementById('btn-import').addEventListener('click', importData);
       }
 
-      /* ---------- DETAIL (pannable chart, reversed direction) ---------- */
+      /* ---------- DETAIL ---------- */
       function renderDetail(id) {
           const ex = EXERCISES.find(e => e.id === id);
           if (!ex) { location.hash = ""; return; }
@@ -310,29 +370,33 @@
           const k = keysFor(id, date);
           const count = parseInt(localStorage.getItem(k.count) || "0", 10);
           const notes = localStorage.getItem(k.notes) || "";
+          const accentColor = CLR_MAP[ex.clr] || 'var(--accent)';
 
-          document.title = `${ex.name}`;
+          document.title = ex.name;
 
           app.innerHTML = `
-    <a class="back" href="#">← All exercises</a>
+    <a class="back" href="#">&larr; All exercises</a>
     <div class="card fade">
       <div class="row">
-        <h1 style="margin:0">${ex.emoji} ${ex.name}</h1>
-        <div class="muted">
-          <label for="day" style="display:block;margin:0 0 4px;">Date</label>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="color:${accentColor};width:32px;height:32px;display:block">${(ICONS[id]||'').replace('class="tile-icon"','style="width:32px;height:32px"')}</span>
+          <h1 style="margin:0;font-size:20px">${ex.name}</h1>
+        </div>
+        <div>
+          <label for="day" style="margin:0 0 4px;font-size:11px">Date</label>
           <input id="day" type="date" value="${date}">
         </div>
       </div>
 
-      <div class="stepper" style="margin-top:12px;">
-        <button class="btn" id="minus" aria-label="decrease">–</button>
-        <div class="count" id="count" role="status" aria-live="polite">${isNaN(count)?0:count}</div>
+      <div class="stepper">
+        <button class="btn" id="minus" aria-label="decrease">&ndash;</button>
+        <div class="count" id="count" role="status" aria-live="polite" style="color:${accentColor}">${isNaN(count)?0:count}</div>
         <button class="btn" id="plus" aria-label="increase">+</button>
         <div class="muted" style="margin-left:auto">${ex.unit}</div>
       </div>
 
       <label for="notes">Notes (optional)</label>
-      <input id="notes" type="text" placeholder="sets × reps, comments" value="${esc(notes)}">
+      <input id="notes" type="text" placeholder="sets \u00d7 reps, comments" value="${esc(notes)}">
       <div class="note" id="status">Saved</div>
 
       <div class="chart-wrap">
@@ -343,7 +407,6 @@
       <div class="stats" id="stats"></div>
     </div>`;
 
-          // --- wiring ---
           const $count  = document.getElementById('count');
           const $minus  = document.getElementById('minus');
           const $plus   = document.getElementById('plus');
@@ -354,7 +417,7 @@
           const $label  = document.getElementById('rangeLabel');
           const $stats  = document.getElementById('stats');
 
-          const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.7';},250); };
+          const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.5';},250); };
 
           function updateStats() {
               const streak = getStreak(id);
@@ -366,7 +429,7 @@
               const arrow = diff > 0 ? '<span class="stat-arrow-up">&#9650;</span>' : diff < 0 ? '<span class="stat-arrow-down">&#9660;</span>' : '<span class="stat-arrow-same">&#9654;</span>';
               const freqLabel = ex.dpw === 7 ? 'daily' : `${ex.dpw}x/wk`;
               $stats.innerHTML = `
-                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak (days)</div></div>
+                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak</div></div>
                 <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
                 <div class="stat"><div class="stat-val">${weekDays}/${ex.dpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
                 <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
@@ -418,7 +481,7 @@
           let earliest = todayStr();
           let latest = todayStr();
           let maxOffsetDays = 0;
-          let offsetDays = 0;   // 0 = window ends today; larger = older window
+          let offsetDays = 0;
           let pxPerDay = 8;
 
           function computeBounds() {
@@ -445,13 +508,15 @@
                   const d = addDays(start, i);
                   const ds = isoDate(d);
                   const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-                  labels.push(ds.slice(5)); // MM-DD
+                  labels.push(ds.slice(5));
                   values.push(isNaN(v)?0:v);
               }
               return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
           }
 
           // --- drawing ---
+          const barColor = getComputedStyle(document.documentElement).getPropertyValue(`--clr-${ex.clr}`).trim() || '#6ea8fe';
+
           function drawHistory() {
               const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
               const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
@@ -474,7 +539,7 @@
               pxPerDay = w / WINDOW_DAYS;
 
               // axes
-              ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
               ctx.lineWidth = 1;
               ctx.beginPath();
               ctx.moveTo(pad.l, pad.t);
@@ -483,8 +548,8 @@
               ctx.stroke();
 
               // y ticks
-              ctx.fillStyle = 'rgba(255,255,255,0.6)';
-              ctx.font = '12px -apple-system, system-ui, Arial';
+              ctx.fillStyle = 'rgba(255,255,255,0.45)';
+              ctx.font = '11px -apple-system, system-ui, Arial';
               ctx.textAlign = 'right';
               ctx.textBaseline = 'middle';
               ctx.fillText('0', pad.l - 6, pad.t + h);
@@ -492,18 +557,32 @@
 
               // bars
               const startX = pad.l;
-              ctx.fillStyle = '#6ea8fe';
+              ctx.fillStyle = barColor;
+              ctx.globalAlpha = 0.7;
               for (let i = 0; i < values.length; i++) {
                   const v = values[i];
                   const x = startX + i * (barW + barGap);
                   const bh = (v / maxV) * h;
                   const y = pad.t + h - bh;
-                  ctx.fillRect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
+                  ctx.beginPath();
+                  const r = Math.min(3, barW/2);
+                  if (bh > r) {
+                      ctx.moveTo(Math.round(x), Math.round(y + bh));
+                      ctx.lineTo(Math.round(x), Math.round(y + r));
+                      ctx.quadraticCurveTo(Math.round(x), Math.round(y), Math.round(x + r), Math.round(y));
+                      ctx.lineTo(Math.round(x + barW - r), Math.round(y));
+                      ctx.quadraticCurveTo(Math.round(x + barW), Math.round(y), Math.round(x + barW), Math.round(y + r));
+                      ctx.lineTo(Math.round(x + barW), Math.round(y + bh));
+                  } else if (bh > 0) {
+                      ctx.rect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
+                  }
+                  ctx.fill();
               }
+              ctx.globalAlpha = 1;
 
               // 7-day SMA trend line
               if (values.length >= 7) {
-                  ctx.strokeStyle = 'rgba(251,191,36,0.7)';
+                  ctx.strokeStyle = 'rgba(251,191,36,0.8)';
                   ctx.lineWidth = 2;
                   ctx.beginPath();
                   let started = false;
@@ -519,21 +598,21 @@
                   ctx.stroke();
               }
 
-              // x labels (sparse)
-              ctx.fillStyle = 'rgba(255,255,255,0.6)';
+              // x labels
+              ctx.fillStyle = 'rgba(255,255,255,0.4)';
+              ctx.font = '10px -apple-system, system-ui, Arial';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
               const step = Math.max(1, Math.ceil(labels.length / 5));
               for (let i = 0; i < labels.length; i += step) {
                   const x = startX + i * (barW + barGap) + barW / 2;
-                  ctx.fillText(labels[i], Math.round(x), pad.t + h + 4);
+                  ctx.fillText(labels[i], Math.round(x), pad.t + h + 5);
               }
 
-              // range label — hint removed
-              $label.textContent = `${startISO} → ${eISO}`;
+              $label.textContent = `${startISO}  \u2192  ${eISO}`;
           }
 
-          // --- interactions (reversed direction) ---
+          // --- interactions ---
           let dragging = false;
           let startX = 0;
 
@@ -548,7 +627,6 @@
               const dx = e.clientX - startX;
               const deltaDays = Math.round(dx / pxPerDay);
               if (deltaDays !== 0) {
-                  // reversed vs earlier version
                   offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
                   startX += deltaDays * pxPerDay;
                   drawHistory();
@@ -564,7 +642,6 @@
           $chart.addEventListener('pointercancel', endDrag);
           $chart.addEventListener('pointerleave', endDrag);
 
-          // Wheel (Shift for horizontal on many systems). Reversed mapping.
           $chart.addEventListener('wheel', (e) => {
               e.preventDefault();
               const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -572,7 +649,6 @@
               drawHistory();
           }, {passive:false});
 
-          // Keyboard: ← newer, → older (reversed from earlier)
           const onKey = (e) => {
               if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
               if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
@@ -585,7 +661,7 @@
           updateStats();
           addEventListener('resize', drawHistory, {passive:true});
 
-          (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.7'; })();
+          (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.5'; })();
       }
 
       /* ---------- ROUTER ---------- */
