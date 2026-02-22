@@ -77,6 +77,24 @@
       .stat-arrow-down { color:#f87171; }
       .stat-arrow-same { color:var(--accent); }
 
+      /* --- Dashboard --- */
+      .dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+      .dash-overall { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:10px; margin-bottom:24px; }
+      .dash-overall .stat { background:var(--card); border:1px solid var(--card-border); }
+      .dash-cat { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r); padding:18px; margin-bottom:14px; }
+      .dash-cat-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+      .dash-cat-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; }
+      .dash-cat-pct { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+      .dash-bar-track { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; margin-bottom:14px; }
+      .dash-bar-fill { height:100%; border-radius:3px; transition:width .3s ease; }
+      .dash-ex-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+      .dash-ex-row + .dash-ex-row { border-top:1px solid rgba(255,255,255,.05); }
+      .dash-ex-name { font-size:12px; font-weight:500; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .dash-ex-freq { font-size:11px; color:var(--text-muted); font-variant-numeric:tabular-nums; width:40px; text-align:right; }
+      .dash-spark { display:flex; align-items:flex-end; gap:1px; height:20px; }
+      .dash-spark-bar { width:4px; border-radius:1px; min-height:1px; }
+      .dash-ex-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
       /* --- Animations --- */
       .fade { animation: fade .2s ease; } @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
@@ -353,6 +371,7 @@
           // Group exercises by category for section headers
           let html = `<h1>Exercises</h1>
     <div class="toolbar">
+      <a class="toolbar-btn" href="#dashboard" style="text-decoration:none">Dashboard</a>
       <button class="toolbar-btn" id="btn-export">Export Backup</button>
       <button class="toolbar-btn" id="btn-import">Import Backup</button>
     </div>`;
@@ -687,10 +706,115 @@
           (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.5'; })();
       }
 
+      /* ---------- DASHBOARD ---------- */
+      function renderDashboard() {
+          document.title = "Dashboard";
+          const today = todayStr();
+          const todayDate = new Date(today);
+          const dow = todayDate.getUTCDay();
+          const daysSinceMonday = dow === 0 ? 6 : dow - 1;
+
+          // Overall stats: days active this week, total exercises on track
+          let daysActiveThisWeek = 0;
+          for (let i = 0; i <= daysSinceMonday; i++) {
+              const ds = isoDate(addDays(todayDate, -daysSinceMonday + i));
+              let anyDone = false;
+              for (const ex of EXERCISES) {
+                  const v = parseInt(localStorage.getItem(keysFor(ex.id, ds).count) || "0", 10);
+                  if (v > 0) { anyDone = true; break; }
+              }
+              if (anyDone) daysActiveThisWeek++;
+          }
+          const onTrackCount = EXERCISES.filter(ex => isOnTrack(ex.id, ex.dpw)).length;
+
+          // Group by category (data-driven from clr field)
+          const categories = [];
+          const seen = new Set();
+          for (const ex of EXERCISES) {
+              if (!seen.has(ex.clr)) {
+                  seen.add(ex.clr);
+                  categories.push(ex.clr);
+              }
+          }
+
+          // Build 7-day date range (current week Mon-today)
+          const weekDates = [];
+          for (let i = 0; i <= daysSinceMonday; i++) {
+              weekDates.push(isoDate(addDays(todayDate, -daysSinceMonday + i)));
+          }
+
+          let html = `
+    <div class="dash-header">
+      <h1>Dashboard</h1>
+      <a class="back" href="#">&larr; Back</a>
+    </div>
+    <div class="dash-overall fade">
+      <div class="stat"><div class="stat-val">${daysActiveThisWeek}/${daysSinceMonday + 1}</div><div class="stat-label">Days active this wk</div></div>
+      <div class="stat"><div class="stat-val">${onTrackCount}/${EXERCISES.length}</div><div class="stat-label">On track</div></div>
+      <div class="stat"><div class="stat-val">${EXERCISES.filter(ex => parseInt(localStorage.getItem(keysFor(ex.id, today).count) || "0", 10) > 0).length}/${EXERCISES.length}</div><div class="stat-label">Done today</div></div>
+    </div>`;
+
+          for (const cat of categories) {
+              const exs = EXERCISES.filter(e => e.clr === cat);
+              const catLabel = SECTION_LABELS[cat] || cat;
+              const catColor = CLR_MAP[cat] || 'var(--accent)';
+
+              // Category completion: % of exercises on track
+              const catOnTrack = exs.filter(ex => isOnTrack(ex.id, ex.dpw)).length;
+              const catPct = Math.round((catOnTrack / exs.length) * 100);
+
+              html += `<div class="dash-cat fade">
+        <div class="dash-cat-header">
+          <div class="dash-cat-title" style="color:${catColor}">${catLabel}</div>
+          <div class="dash-cat-pct" style="color:${catPct === 100 ? '#4ade80' : catColor}">${catPct}%</div>
+        </div>
+        <div class="dash-bar-track">
+          <div class="dash-bar-fill" style="width:${catPct}%;background:${catColor}"></div>
+        </div>`;
+
+              for (const ex of exs) {
+                  const onTrack = isOnTrack(ex.id, ex.dpw);
+                  const { done, elapsed } = ex.dpw === 7
+                      ? { done: parseInt(localStorage.getItem(keysFor(ex.id, today).count) || "0", 10) > 0 ? 1 : 0, elapsed: 1 }
+                      : getCurrentWeekProgress(ex.id);
+                  const freqLabel = ex.dpw === 7 ? `${done ? 1 : 0}/1 today` : `${done}/${ex.dpw} this wk`;
+
+                  // Sparkline: last 7 days
+                  const sparkVals = [];
+                  for (let i = 6; i >= 0; i--) {
+                      const ds = isoDate(addDays(todayDate, -i));
+                      sparkVals.push(parseInt(localStorage.getItem(keysFor(ex.id, ds).count) || "0", 10));
+                  }
+                  const sparkMax = Math.max(1, ...sparkVals);
+                  const sparkBars = sparkVals.map(v => {
+                      const h = Math.max(1, Math.round((v / sparkMax) * 20));
+                      const opacity = v > 0 ? '0.8' : '0.15';
+                      return `<div class="dash-spark-bar" style="height:${h}px;background:${catColor};opacity:${opacity}"></div>`;
+                  }).join('');
+
+                  const statusColor = onTrack ? '#4ade80' : 'rgba(255,255,255,.15)';
+
+                  html += `
+        <div class="dash-ex-row">
+          <div class="dash-ex-status" style="background:${statusColor}"></div>
+          <a href="#${ex.id}" class="dash-ex-name" style="color:var(--text);text-decoration:none">${ex.name}</a>
+          <div class="dash-spark">${sparkBars}</div>
+          <div class="dash-ex-freq">${freqLabel}</div>
+        </div>`;
+              }
+
+              html += `</div>`;
+          }
+
+          app.innerHTML = html;
+      }
+
       /* ---------- ROUTER ---------- */
       function route() {
           const id = location.hash.replace(/^#/, '');
-          if (id) renderDetail(id); else renderHome();
+          if (id === 'dashboard') renderDashboard();
+          else if (id) renderDetail(id);
+          else renderHome();
       }
       addEventListener('hashchange', route, {passive:true});
       route();

@@ -29,6 +29,10 @@ Overcome the biomechanical issues described above and become overall stronger. A
 - **Every change must bump the version number** in `service-worker.js` (`APP_VERSION` constant). This ensures the PWA cache is invalidated and users get the latest version.
 - **Summary format:** When done with a change, format the summary like a git commit — a short title line (imperative mood, under 70 chars) followed by a body describing what changed and why.
 
+## Design Principles
+
+- **Keep implementations data-driven, not hard-coded.** Features should derive behavior from the exercise config (`EXERCISES` array) and its properties (`dpw`, `clr`, `unit`, etc.) rather than containing exercise- or category-specific logic. Adding a new exercise or category should only require adding an entry to the config — not touching feature code. New features should scale O(n) with the number of exercises, not O(n^2) with feature-exercise combinations.
+
 ## Technical Notes
 
 - Entire app lives in `index.html` (HTML + CSS + JS, no build step)
