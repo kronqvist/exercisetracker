@@ -264,6 +264,42 @@
           return Object.values(data).reduce((s, v) => s + v, 0);
       }
 
+      function slidingWindowTotal(id, endDate, days) {
+          let total = 0;
+          for (let i = 0; i < days; i++) {
+              const ds = isoDate(addDays(endDate, -i));
+              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+              if (!isNaN(v)) total += v;
+          }
+          return total;
+      }
+
+      function avgWeeklyVolume(id, days) {
+          const today = new Date(todayStr());
+          const total = slidingWindowTotal(id, today, days);
+          return total / (days / 7);
+      }
+
+      function bestWeekEver(id) {
+          const data = getAllDataForExercise(id);
+          const dates = Object.keys(data).sort();
+          if (dates.length === 0) return 0;
+          const first = new Date(dates[0]);
+          const today = new Date(todayStr());
+          const span = daysBetween(dates[0], todayStr());
+          let best = 0;
+          for (let offset = 0; offset <= span; offset++) {
+              const end = addDays(today, -offset);
+              let sum = 0;
+              for (let i = 0; i < 7; i++) {
+                  const ds = isoDate(addDays(end, -i));
+                  if (data[ds]) sum += data[ds];
+              }
+              if (sum > best) best = sum;
+          }
+          return best;
+      }
+
       /* ====== ON-TRACK LOGIC (sliding 7-day window) ====== */
       function getCurrentWeekProgress(id) {
           const today = new Date(todayStr());
@@ -464,13 +500,25 @@
 
           const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.5';},250); };
 
+          function trendArrow(current, previous) {
+              if (current > previous) return '<span class="stat-arrow-up">&#9650;</span>';
+              if (current < previous) return '<span class="stat-arrow-down">&#9660;</span>';
+              return '<span class="stat-arrow-same">&#9654;</span>';
+          }
+
+          function formatAvg(v) {
+              return v % 1 === 0 ? String(v) : v.toFixed(1);
+          }
+
           function updateStats() {
               const streak = getStreak(id);
               const thisWeek = getWeekTotal(id, 0);
               const lastWeek = getWeekTotal(id, 1);
               const total = getAllTimeTotal(id);
-              const diff = thisWeek - lastWeek;
-              const arrow = diff > 0 ? '<span class="stat-arrow-up">&#9650;</span>' : diff < 0 ? '<span class="stat-arrow-down">&#9660;</span>' : '<span class="stat-arrow-same">&#9654;</span>';
+              const avg30 = avgWeeklyVolume(id, 30);
+              const avg90 = avgWeeklyVolume(id, 90);
+              const bestWk = bestWeekEver(id);
+              const arrow = trendArrow(thisWeek, lastWeek);
 
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
@@ -489,6 +537,9 @@
                 <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
                 <div class="stat"><div class="stat-val">${weekDays}/${targetDpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
                 <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
+                <div class="stat"><div class="stat-val">${formatAvg(avg30)}</div><div class="stat-label">30d avg/wk</div></div>
+                <div class="stat"><div class="stat-val">${formatAvg(avg90)}</div><div class="stat-label">90d avg/wk</div></div>
+                <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
                 <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
               `;
           }
