@@ -291,6 +291,8 @@
       }
 
       function isOnTrack(id, dpw) {
+          const todayCount = parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10);
+          if (todayCount > 0) return true;
           const ex = EXERCISES.find(e => e.id === id);
           const pooledDpw = ex ? CAT_DPW[ex.clr] : undefined;
           if (pooledDpw !== undefined) {

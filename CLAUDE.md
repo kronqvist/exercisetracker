@@ -32,6 +32,7 @@ Overcome the biomechanical issues described above and become overall stronger. A
 ## Design Principles
 
 - **Keep implementations data-driven, not hard-coded.** Features should derive behavior from the exercise config (`EXERCISES` array) and its properties (`dpw`, `clr`, `unit`, etc.) rather than containing exercise- or category-specific logic. Adding a new exercise or category should only require adding an entry to the config — not touching feature code. New features should scale O(n) with the number of exercises, not O(n^2) with feature-exercise combinations.
+- **Readable code over compact code.** Favour intermediate variables, named conditions, and short single-purpose functions over dense one-liners. A line of code should be parseable at a glance; if it needs a second read, break it apart.
 
 ## Technical Notes
 
