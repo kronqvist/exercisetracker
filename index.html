@@ -132,26 +132,26 @@
 
       /* ====== CONFIG ====== */
       const EXERCISES = [
-          /* Stretches — daily: neural tone resets overnight, no tissue damage */
-          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", unit:"sec",  dpw:7, clr:"stretch"},
-          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         unit:"sec",  dpw:7, clr:"stretch"},
-          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      unit:"sec",  dpw:7, clr:"stretch"},
+          /* Stretches — 5x/week */
+          {id:"hip-flexor-stretch", name:"Half-Kneeling Hip-Flexor Stretch", unit:"sec",  dpw:5, clr:"stretch"},
+          {id:"hamstring-stretch",  name:"Supine Hamstring Stretch",         unit:"sec",  dpw:5, clr:"stretch"},
+          {id:"figure4-stretch",    name:"Figure-4 Piriformis Stretch",      unit:"sec",  dpw:5, clr:"stretch"},
 
-          /* Motor control — daily: neural pattern training, not strength */
-          {id:"side-plank",         name:"Side Plank",           unit:"sec",  dpw:7, clr:"motor"},
-          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", dpw:7, clr:"motor"},
-          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  dpw:7, clr:"motor"},
-          {id:"dead-bug",           name:"Dead Bug",             unit:"reps", dpw:7, clr:"motor"},
-          {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", dpw:7, clr:"motor"},
+          /* Motor control — 5x/week */
+          {id:"side-plank",         name:"Side Plank",           unit:"sec",  dpw:5, clr:"motor"},
+          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", dpw:5, clr:"motor"},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  dpw:5, clr:"motor"},
+          {id:"dead-bug",           name:"Dead Bug",             unit:"reps", dpw:5, clr:"motor"},
+          {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", dpw:5, clr:"motor"},
 
-          /* Rehab strengthening — 5x/week: low-load but benefits from recovery */
-          {id:"suitcase-carry",     name:"Suitcase Carry",       unit:"sec",  dpw:5, clr:"rehab"},
-          {id:"glute-bridge",       name:"Glute Bridge",         unit:"reps", dpw:5, clr:"rehab"},
-          {id:"clamshell",          name:"Clamshell",            unit:"reps", dpw:5, clr:"rehab"},
-          {id:"draken",             name:"Draken",               unit:"reps", dpw:5, clr:"rehab"},
-          {id:"hip-adduction",      name:"Hip Adduction",        unit:"reps", dpw:5, clr:"rehab"},
-          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", unit:"reps", dpw:5, clr:"rehab"},
-          {id:"rubber-band-row",    name:"Rubber Band Row",      unit:"reps", dpw:5, clr:"rehab"},
+          /* Rehab strengthening — 3x/week */
+          {id:"suitcase-carry",     name:"Suitcase Carry",       unit:"sec",  dpw:3, clr:"rehab"},
+          {id:"glute-bridge",       name:"Glute Bridge",         unit:"reps", dpw:3, clr:"rehab"},
+          {id:"clamshell",          name:"Clamshell",            unit:"reps", dpw:3, clr:"rehab"},
+          {id:"draken",             name:"Draken",               unit:"reps", dpw:3, clr:"rehab"},
+          {id:"hip-adduction",      name:"Hip Adduction",        unit:"reps", dpw:3, clr:"rehab"},
+          {id:"rubber-band-archer", name:"Rubber Band Archer Pull", unit:"reps", dpw:3, clr:"rehab"},
+          {id:"rubber-band-row",    name:"Rubber Band Row",      unit:"reps", dpw:3, clr:"rehab"},
 
           /* Strength — 3x/week per exercise: needs 48-72h recovery */
           {id:"pushups",            name:"Push-Ups",             unit:"reps", dpw:3, clr:"strength"},
@@ -249,12 +249,10 @@
 
       function getWeekTotal(id, weeksAgo) {
           const today = new Date(todayStr());
-          const dow = today.getUTCDay();
-          const endOfWeek = addDays(today, -dow - (weeksAgo * 7));
-          const startOfWeek = addDays(endOfWeek, -6);
+          const end = addDays(today, -(weeksAgo * 7));
           let total = 0;
           for (let i = 0; i < 7; i++) {
-              const ds = isoDate(addDays(startOfWeek, i));
+              const ds = isoDate(addDays(end, -i));
               const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
               if (!isNaN(v)) total += v;
           }
@@ -266,68 +264,39 @@
           return Object.values(data).reduce((s, v) => s + v, 0);
       }
 
-      function getWeekDays(id, weeksAgo) {
+      /* ====== ON-TRACK LOGIC (sliding 7-day window) ====== */
+      function getCurrentWeekProgress(id) {
           const today = new Date(todayStr());
-          const dow = today.getUTCDay();
-          const endOfWeek = addDays(today, -dow - (weeksAgo * 7));
-          const startOfWeek = addDays(endOfWeek, -6);
           let days = 0;
           for (let i = 0; i < 7; i++) {
-              const ds = isoDate(addDays(startOfWeek, i));
+              const ds = isoDate(addDays(today, -i));
               const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
               if (v > 0) days++;
           }
           return days;
       }
 
-      /* ====== ON-TRACK LOGIC ====== */
-      function getCurrentWeekProgress(id) {
-          const today = new Date(todayStr());
-          const dow = today.getUTCDay(); // 0=Sun
-          const daysSinceMonday = dow === 0 ? 6 : dow - 1; // Mon=0..Sun=6
-          let days = 0;
-          for (let i = 0; i <= daysSinceMonday; i++) {
-              const ds = isoDate(addDays(today, -daysSinceMonday + i));
-              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-              if (v > 0) days++;
-          }
-          return { done: days, elapsed: daysSinceMonday + 1 };
-      }
-
       function getCategoryWeekProgress(cat) {
           const today = new Date(todayStr());
-          const dow = today.getUTCDay();
-          const daysSinceMonday = dow === 0 ? 6 : dow - 1;
           const catExercises = EXERCISES.filter(e => e.clr === cat);
           let days = 0;
-          for (let i = 0; i <= daysSinceMonday; i++) {
-              const ds = isoDate(addDays(today, -daysSinceMonday + i));
+          for (let i = 0; i < 7; i++) {
+              const ds = isoDate(addDays(today, -i));
               const anyDone = catExercises.some(ex =>
                   parseInt(localStorage.getItem(keysFor(ex.id, ds).count) || "0", 10) > 0
               );
               if (anyDone) days++;
           }
-          return { done: days, elapsed: daysSinceMonday + 1 };
+          return days;
       }
 
       function isOnTrack(id, dpw) {
-          const doneToday = parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10) > 0;
-          if (doneToday) return true;
-
           const ex = EXERCISES.find(e => e.id === id);
           const pooledDpw = ex ? CAT_DPW[ex.clr] : undefined;
-
           if (pooledDpw !== undefined) {
-              // Pooled category: on track if any exercise in the category meets the shared target pace
-              const { done, elapsed } = getCategoryWeekProgress(ex.clr);
-              const needed = Math.floor(pooledDpw * elapsed / 7);
-              return done >= needed;
+              return getCategoryWeekProgress(ex.clr) >= pooledDpw;
           }
-
-          if (dpw === 7) return false;
-          const { done, elapsed } = getCurrentWeekProgress(id);
-          const needed = Math.floor(dpw * elapsed / 7);
-          return done >= needed;
+          return getCurrentWeekProgress(id) >= dpw;
       }
 
       /* ====== EXPORT / IMPORT ====== */
@@ -504,14 +473,13 @@
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
               if (pooledDpw !== undefined) {
-                  const prog = getCategoryWeekProgress(ex.clr);
-                  weekDays = prog.done;
+                  weekDays = getCategoryWeekProgress(ex.clr);
                   targetDpw = pooledDpw;
                   freqLabel = `${pooledDpw}x/wk shared`;
               } else {
-                  weekDays = getWeekDays(id, 0);
+                  weekDays = getCurrentWeekProgress(id);
                   targetDpw = ex.dpw;
-                  freqLabel = ex.dpw === 7 ? 'daily' : `${ex.dpw}x/wk`;
+                  freqLabel = `${ex.dpw}x/wk`;
               }
 
               $stats.innerHTML = `
@@ -755,13 +723,11 @@
           document.title = "Dashboard";
           const today = todayStr();
           const todayDate = new Date(today);
-          const dow = todayDate.getUTCDay();
-          const daysSinceMonday = dow === 0 ? 6 : dow - 1;
 
-          // Overall stats: days active this week, total exercises on track
+          // Overall stats: days active in sliding 7-day window
           let daysActiveThisWeek = 0;
-          for (let i = 0; i <= daysSinceMonday; i++) {
-              const ds = isoDate(addDays(todayDate, -daysSinceMonday + i));
+          for (let i = 0; i < 7; i++) {
+              const ds = isoDate(addDays(todayDate, -i));
               let anyDone = false;
               for (const ex of EXERCISES) {
                   const v = parseInt(localStorage.getItem(keysFor(ex.id, ds).count) || "0", 10);
@@ -781,19 +747,13 @@
               }
           }
 
-          // Build 7-day date range (current week Mon-today)
-          const weekDates = [];
-          for (let i = 0; i <= daysSinceMonday; i++) {
-              weekDates.push(isoDate(addDays(todayDate, -daysSinceMonday + i)));
-          }
-
           let html = `
     <div class="dash-header">
       <h1>Dashboard</h1>
       <a class="back" href="#">&larr; Back</a>
     </div>
     <div class="dash-overall fade">
-      <div class="stat"><div class="stat-val">${daysActiveThisWeek}/${daysSinceMonday + 1}</div><div class="stat-label">Days active this wk</div></div>
+      <div class="stat"><div class="stat-val">${daysActiveThisWeek}/7</div><div class="stat-label">Days active this wk</div></div>
       <div class="stat"><div class="stat-val">${onTrackCount}/${EXERCISES.length}</div><div class="stat-label">On track</div></div>
       <div class="stat"><div class="stat-val">${EXERCISES.filter(ex => parseInt(localStorage.getItem(keysFor(ex.id, today).count) || "0", 10) > 0).length}/${EXERCISES.length}</div><div class="stat-label">Done today</div></div>
     </div>`;
@@ -823,12 +783,9 @@
                   const onTrack = isOnTrack(ex.id, ex.dpw);
                   let freqLabel;
                   if (pooledDpw !== undefined) {
-                      freqLabel = `${pooledProgress.done}/${pooledDpw} this wk`;
-                  } else if (ex.dpw === 7) {
-                      const doneToday = parseInt(localStorage.getItem(keysFor(ex.id, today).count) || "0", 10) > 0;
-                      freqLabel = `${doneToday ? 1 : 0}/1 today`;
+                      freqLabel = `${pooledProgress}/${pooledDpw} this wk`;
                   } else {
-                      const { done } = getCurrentWeekProgress(ex.id);
+                      const done = getCurrentWeekProgress(ex.id);
                       freqLabel = `${done}/${ex.dpw} this wk`;
                   }
 
