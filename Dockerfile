@@ -5,7 +5,8 @@ FROM debian:stable-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    gnupg && \
+    gnupg \
+    poppler-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 20 & Gemini CLI
