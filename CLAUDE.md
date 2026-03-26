@@ -42,11 +42,11 @@ Overcome the biomechanical issues described above and become overall stronger. A
 
 ## Progressive Overload Algorithm
 
-Volume must rise, but slowly; the body adapts on its own schedule. The green zone algorithm honours this by anchoring to the past rather than tracking the present.
+Volume must rise, but slowly; the body adapts on its own schedule. The green zone algorithm honours this by anchoring to proven capability rather than recent activity.
 
-At any moment *t*, `anchoredTarget(t)` takes the 90-day average ending 90 days before *t* (a window over training 90 to 180 days gone) and projects it forward at 10 %/month compound. The green zone spans 100 to 115 % of that projection. A fortnight of reckless intensity cannot perturb the target; three quiet months must pass before any sustained change propagates into the anchor. The algorithm is, by construction, a lagging functor over the user's own trajectory: faithful, unhurried, immune to transient spikes.
+The baseline is `bestAvg90(id)`: the highest 90-day weekly average ever recorded for a given exercise. This value can only ratchet upward. Idle periods cannot erode it; short bursts cannot inflate it (90 days of sustained volume are required to shift it). The green zone spans 100 to 115 % of this peak baseline. Growth incentive is structural: consistently training at 110 % of your best eventually produces a new best window, and the ratchet clicks forward.
 
-Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `anchoredTarget()`. The chart plots the rolling 30-day weekly average against a per-point green band whose slope reflects genuine long-term progression, never short-term noise.
+Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestAvg90()`. The chart plots the rolling 30-day weekly average against a flat green band that steps upward only when a new peak 90-day window forms.
 
 ## Critical Rules
 
