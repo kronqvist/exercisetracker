@@ -97,10 +97,10 @@
 
       /* --- Zone dot --- */
       .tile-zone { position:absolute; top:8px; right:8px; width:8px; height:8px; border-radius:50%; }
-      .zone-green { background:#4ade80; }
-      .zone-under { background:#60a5fa; }
-      .zone-over  { background:#fbbf24; }
-      .zone-grey  { background:rgba(232,232,240,.25); }
+      .zone-green  { background:#4ade80; }
+      .zone-yellow { background:#fbbf24; }
+      .zone-red    { background:#f87171; }
+      .zone-grey   { background:rgba(232,232,240,.25); }
 
       /* --- Animations --- */
       .fade { animation: fade .2s ease; } @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
@@ -296,9 +296,11 @@
           if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
           const recent = avgWeeklyVolume(id, 30);
           const ratio = recent / baseline;
-          if (ratio < 1.05) return { cls: 'zone-under', label: `${Math.round(ratio*100)}% of baseline — increase` };
-          if (ratio <= 1.15) return { cls: 'zone-green', label: `${Math.round(ratio*100)}% of baseline — green zone` };
-          return { cls: 'zone-over', label: `${Math.round(ratio*100)}% of baseline — back off` };
+          const pct = Math.round(ratio * 100);
+          if (ratio < 1.00) return { cls: 'zone-grey', label: `${pct}% of baseline` };
+          if (ratio <= 1.15) return { cls: 'zone-green', label: `${pct}% of baseline — green zone` };
+          if (ratio <= 1.30) return { cls: 'zone-yellow', label: `${pct}% of baseline — ease off` };
+          return { cls: 'zone-red', label: `${pct}% of baseline — back off` };
       }
 
       function bestWeekEver(id) {
@@ -747,23 +749,39 @@
               $label.textContent = `${startISO}  \u2192  ${eISO}`;
           }
 
-          /* --- zone chart: rolling 30d avg/wk with green zone band --- */
-          function rollingAvgSeries(exerciseId, windowDays, numPoints) {
+          /* --- zone chart: rolling 30d avg/wk with per-point green zone --- */
+          const ZONE_WEEKS = 26;
+          let zoneOffsetWeeks = 0;
+          let maxZoneOffset = 0;
+          let pxPerWeek = 8;
+
+          function zoneSeries(exerciseId, numWeeks, offsetWeeks) {
               const today = new Date(todayStr());
+              const endRef = addDays(today, -offsetWeeks * 7);
               const points = [];
-              for (let i = numPoints - 1; i >= 0; i--) {
-                  const end = addDays(today, -i * 7);
-                  const total = slidingWindowTotal(exerciseId, end, windowDays);
-                  const avg = total / (windowDays / 7);
-                  points.push({ date: isoDate(end), value: avg });
+              for (let i = numWeeks - 1; i >= 0; i--) {
+                  const end = addDays(endRef, -i * 7);
+                  const avg30 = slidingWindowTotal(exerciseId, end, 30) / (30 / 7);
+                  const avg90 = slidingWindowTotal(exerciseId, end, 90) / (90 / 7);
+                  points.push({ date: isoDate(end), avg30, baseline: avg90 });
               }
               return points;
           }
 
+          function computeZoneBounds() {
+              const data = getAllDataForExercise(id);
+              const dates = Object.keys(data).sort();
+              if (dates.length === 0) { maxZoneOffset = 0; return; }
+              const firstDate = new Date(dates[0]);
+              const today = new Date(todayStr());
+              const totalWeeks = Math.floor((today - firstDate) / (7 * 864e5));
+              maxZoneOffset = Math.max(0, totalWeeks - ZONE_WEEKS + 1);
+              zoneOffsetWeeks = clamp(zoneOffsetWeeks, 0, maxZoneOffset);
+          }
+
           function drawZoneChart() {
-              const weeks = 13;
-              const recent = rollingAvgSeries(id, 30, weeks);
-              const baseline90 = avgWeeklyVolume(id, 90);
+              computeZoneBounds();
+              const pts = zoneSeries(id, ZONE_WEEKS, zoneOffsetWeeks);
 
               const dpr = window.devicePixelRatio || 1;
               const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
@@ -777,39 +795,40 @@
               const pad = { l: 40, r: 8, t: 8, b: 24 };
               const w = cssW - pad.l - pad.r;
               const h = cssH - pad.t - pad.b;
+              const n = pts.length;
 
-              const zoneLow = baseline90 * 1.05;
-              const zoneHigh = baseline90 * 1.15;
-              const allVals = recent.map(p => p.value).concat([zoneHigh, zoneLow, baseline90]);
+              const allVals = pts.flatMap(p => [p.avg30, p.baseline * 1.15, p.baseline]);
               const maxV = Math.max(5, ...allVals) * 1.1;
 
               const toY = v => pad.t + h - (v / maxV) * h;
-              const toX = i => pad.l + (i / (weeks - 1)) * w;
+              const toX = i => pad.l + (i / (n - 1)) * w;
+              pxPerWeek = w / (n - 1);
 
-              // green zone band
-              if (baseline90 > 0) {
+              // green zone polygon (per-point 100%–115% of baseline)
+              const hasBaseline = pts.some(p => p.baseline > 0);
+              if (hasBaseline) {
                   ctx.fillStyle = 'rgba(74,222,128,0.12)';
-                  ctx.fillRect(pad.l, toY(zoneHigh), w, toY(zoneLow) - toY(zoneHigh));
+                  ctx.beginPath();
+                  for (let i = 0; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].baseline * 1.15));
+                  for (let i = n - 1; i >= 0; i--) ctx.lineTo(toX(i), toY(pts[i].baseline));
+                  ctx.closePath();
+                  ctx.fill();
 
                   // zone boundary lines
                   ctx.setLineDash([4, 4]);
                   ctx.strokeStyle = 'rgba(74,222,128,0.4)';
                   ctx.lineWidth = 1;
                   ctx.beginPath();
-                  ctx.moveTo(pad.l, toY(zoneLow));
-                  ctx.lineTo(pad.l + w, toY(zoneLow));
-                  ctx.moveTo(pad.l, toY(zoneHigh));
-                  ctx.lineTo(pad.l + w, toY(zoneHigh));
+                  for (let i = 0; i < n; i++) {
+                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].baseline));
+                      else ctx.lineTo(toX(i), toY(pts[i].baseline));
+                  }
                   ctx.stroke();
-                  ctx.setLineDash([]);
-
-                  // 90d baseline reference line
-                  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-                  ctx.lineWidth = 1;
-                  ctx.setLineDash([2, 3]);
                   ctx.beginPath();
-                  ctx.moveTo(pad.l, toY(baseline90));
-                  ctx.lineTo(pad.l + w, toY(baseline90));
+                  for (let i = 0; i < n; i++) {
+                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].baseline * 1.15));
+                      else ctx.lineTo(toX(i), toY(pts[i].baseline * 1.15));
+                  }
                   ctx.stroke();
                   ctx.setLineDash([]);
               }
@@ -830,28 +849,23 @@
               ctx.textBaseline = 'middle';
               ctx.fillText('0', pad.l - 6, pad.t + h);
               ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
-              if (baseline90 > 0) {
-                  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-                  ctx.fillText(String(Math.round(baseline90)), pad.l - 6, toY(baseline90));
-              }
 
               // 30d avg line
               ctx.strokeStyle = barColor;
               ctx.lineWidth = 2.5;
               ctx.beginPath();
-              for (let i = 0; i < recent.length; i++) {
-                  const x = toX(i), y = toY(recent[i].value);
+              for (let i = 0; i < n; i++) {
+                  const x = toX(i), y = toY(pts[i].avg30);
                   if (i === 0) ctx.moveTo(x, y);
                   else ctx.lineTo(x, y);
               }
               ctx.stroke();
 
               // data points
-              for (let i = 0; i < recent.length; i++) {
-                  const x = toX(i), y = toY(recent[i].value);
+              ctx.fillStyle = barColor;
+              for (let i = 0; i < n; i++) {
                   ctx.beginPath();
-                  ctx.arc(x, y, 3, 0, Math.PI * 2);
-                  ctx.fillStyle = barColor;
+                  ctx.arc(toX(i), toY(pts[i].avg30), 3, 0, Math.PI * 2);
                   ctx.fill();
               }
 
@@ -860,12 +874,12 @@
               ctx.font = '10px -apple-system, system-ui, Arial';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              const step = Math.max(1, Math.ceil(weeks / 5));
-              for (let i = 0; i < weeks; i += step) {
-                  ctx.fillText(recent[i].date.slice(5), toX(i), pad.t + h + 5);
+              const step = Math.max(1, Math.ceil(n / 6));
+              for (let i = 0; i < n; i += step) {
+                  ctx.fillText(pts[i].date.slice(5), toX(i), pad.t + h + 5);
               }
 
-              $label.textContent = `30d avg/wk  \u2014  ${recent[0].date} \u2192 ${recent[recent.length - 1].date}`;
+              $label.textContent = `30d avg/wk  \u2014  ${pts[0].date} \u2192 ${pts[n - 1].date}`;
           }
 
           function drawActiveChart() {
@@ -884,7 +898,6 @@
           let startX = 0;
 
           $chart.addEventListener('pointerdown', (e) => {
-              if (chartMode !== 'history') return;
               dragging = true;
               startX = e.clientX;
               $chart.setPointerCapture(e.pointerId);
@@ -893,11 +906,20 @@
           $chart.addEventListener('pointermove', (e) => {
               if (!dragging) return;
               const dx = e.clientX - startX;
-              const deltaDays = Math.round(dx / pxPerDay);
-              if (deltaDays !== 0) {
-                  offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
-                  startX += deltaDays * pxPerDay;
-                  drawHistory();
+              if (chartMode === 'zone') {
+                  const deltaWeeks = Math.round(dx / pxPerWeek);
+                  if (deltaWeeks !== 0) {
+                      zoneOffsetWeeks = clamp(zoneOffsetWeeks + deltaWeeks, 0, maxZoneOffset);
+                      startX += deltaWeeks * pxPerWeek;
+                      drawZoneChart();
+                  }
+              } else {
+                  const deltaDays = Math.round(dx / pxPerDay);
+                  if (deltaDays !== 0) {
+                      offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
+                      startX += deltaDays * pxPerDay;
+                      drawHistory();
+                  }
               }
           });
           function endDrag(e){
@@ -911,17 +933,25 @@
           $chart.addEventListener('pointerleave', endDrag);
 
           $chart.addEventListener('wheel', (e) => {
-              if (chartMode !== 'history') return;
               e.preventDefault();
               const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-              offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
-              drawHistory();
+              if (chartMode === 'zone') {
+                  zoneOffsetWeeks = clamp(zoneOffsetWeeks + (delta > 0 ? -2 : 2), 0, maxZoneOffset);
+                  drawZoneChart();
+              } else {
+                  offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
+                  drawHistory();
+              }
           }, {passive:false});
 
           const onKey = (e) => {
-              if (chartMode !== 'history') return;
-              if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
-              if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+              if (chartMode === 'zone') {
+                  if (e.key === 'ArrowLeft')  { zoneOffsetWeeks = clamp(zoneOffsetWeeks + 1, 0, maxZoneOffset); drawZoneChart(); }
+                  if (e.key === 'ArrowRight') { zoneOffsetWeeks = clamp(zoneOffsetWeeks - 1, 0, maxZoneOffset); drawZoneChart(); }
+              } else {
+                  if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
+                  if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+              }
           };
           document.addEventListener('keydown', onKey);
 
