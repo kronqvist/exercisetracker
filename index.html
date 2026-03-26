@@ -484,16 +484,14 @@
           document.getElementById('btn-export').addEventListener('click', exportData);
           document.getElementById('btn-import').addEventListener('click', importData);
 
-          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-              navigator.serviceWorker.addEventListener('message', function handler(e) {
-                  if (e.data && e.data.version) {
-                      const el = document.getElementById('app-version');
-                      if (el) el.textContent = 'v' + e.data.version;
-                      navigator.serviceWorker.removeEventListener('message', handler);
-                  }
-              });
-              navigator.serviceWorker.controller.postMessage('GET_VERSION');
-          }
+          fetch('./service-worker.js')
+              .then(r => r.text())
+              .then(text => {
+                  const m = text.match(/APP_VERSION\s*=\s*'([^']+)'/);
+                  const el = document.getElementById('app-version');
+                  if (m && el) el.textContent = 'v' + m[1];
+              })
+              .catch(() => {});
       }
 
       /* ---------- DETAIL ---------- */
@@ -578,6 +576,8 @@
               const avg90 = avgWeeklyVolume(id, 90);
               const bestWk = bestWeekEver(id);
               const arrow = trendArrow(thisWeek, lastWeek);
+              const zoneLow = bestAvg90(id);
+              const zoneHigh = zoneLow * 1.15;
 
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
@@ -600,6 +600,7 @@
                 <div class="stat"><div class="stat-val">${formatAvg(avg90)}</div><div class="stat-label">90d avg/wk</div></div>
                 <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
                 <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
+                <div class="stat"><div class="stat-val">${zoneLow > 0 ? formatAvg(zoneLow) + '\u2013' + formatAvg(zoneHigh) : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
               `;
           }
 
