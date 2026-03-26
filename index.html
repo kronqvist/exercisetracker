@@ -576,8 +576,9 @@
               const avg90 = avgWeeklyVolume(id, 90);
               const bestWk = bestWeekEver(id);
               const arrow = trendArrow(thisWeek, lastWeek);
-              const zoneLow = bestAvg90(id);
-              const zoneHigh = zoneLow * 1.15;
+              const zoneBase = bestAvg90(id);
+              const zoneLow = Math.floor(zoneBase);
+              const zoneHigh = Math.ceil(zoneBase * 1.15);
 
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
@@ -600,7 +601,7 @@
                 <div class="stat"><div class="stat-val">${formatAvg(avg90)}</div><div class="stat-label">90d avg/wk</div></div>
                 <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
                 <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
-                <div class="stat"><div class="stat-val">${zoneLow > 0 ? Math.floor(zoneLow) + '\u2013' + Math.ceil(zoneHigh) : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
+                <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
               `;
           }
 
