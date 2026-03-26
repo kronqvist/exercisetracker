@@ -40,6 +40,14 @@ Treatment: myofascial release (QL, glutes, deep hip rotators, TFL, iliopsoas, in
 
 Overcome the biomechanical issues described above and become overall stronger. All features should be designed to support consistency, progressive loading, and balanced rehabilitation coverage.
 
+## Progressive Overload Algorithm
+
+Volume must rise, but slowly; the body adapts on its own schedule. The green zone algorithm honours this by anchoring to the past rather than tracking the present.
+
+At any moment *t*, `anchoredTarget(t)` takes the 90-day average ending 90 days before *t* (a window over training 90 to 180 days gone) and projects it forward at 10 %/month compound. The green zone spans 100 to 115 % of that projection. A fortnight of reckless intensity cannot perturb the target; three quiet months must pass before any sustained change propagates into the anchor. The algorithm is, by construction, a lagging functor over the user's own trajectory: faithful, unhurried, immune to transient spikes.
+
+Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `anchoredTarget()`. The chart plots the rolling 30-day weekly average against a per-point green band whose slope reflects genuine long-term progression, never short-term noise.
+
 ## Critical Rules
 
 - **No changes are allowed that would overwrite existing user data.** All data in localStorage is irreplaceable. Any feature that writes to localStorage must preserve existing entries. Import/merge operations must confirm with the user before touching any key that already has a value.

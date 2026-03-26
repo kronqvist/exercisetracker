@@ -291,16 +291,24 @@
           return total / (days / 7);
       }
 
+      function anchoredTarget(id, atDate) {
+          const anchorDate = addDays(atDate, -90);
+          const anchor = slidingWindowTotal(id, anchorDate, 90) / (90 / 7);
+          if (anchor === 0) return null;
+          const monthsElapsed = 90 / 30;
+          return anchor * Math.pow(1.10, monthsElapsed);
+      }
+
       function progressZone(id) {
-          const baseline = avgWeeklyVolume(id, 90);
-          if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
+          const target = anchoredTarget(id, new Date(todayStr()));
+          if (target === null) return { cls: 'zone-grey', label: 'Insufficient data' };
           const recent = avgWeeklyVolume(id, 30);
-          const ratio = recent / baseline;
+          const ratio = recent / target;
           const pct = Math.round(ratio * 100);
-          if (ratio < 1.00) return { cls: 'zone-grey', label: `${pct}% of baseline` };
-          if (ratio <= 1.15) return { cls: 'zone-green', label: `${pct}% of baseline — green zone` };
-          if (ratio <= 1.30) return { cls: 'zone-yellow', label: `${pct}% of baseline — ease off` };
-          return { cls: 'zone-red', label: `${pct}% of baseline — back off` };
+          if (ratio < 1.00) return { cls: 'zone-grey', label: `${pct}% of target` };
+          if (ratio <= 1.15) return { cls: 'zone-green', label: `${pct}% of target — green zone` };
+          if (ratio <= 1.30) return { cls: 'zone-yellow', label: `${pct}% of target — ease off` };
+          return { cls: 'zone-red', label: `${pct}% of target — back off` };
       }
 
       function bestWeekEver(id) {
@@ -762,8 +770,11 @@
               for (let i = numWeeks - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i * 7);
                   const avg30 = slidingWindowTotal(exerciseId, end, 30) / (30 / 7);
-                  const avg90 = slidingWindowTotal(exerciseId, end, 90) / (90 / 7);
-                  points.push({ date: isoDate(end), avg30, baseline: avg90 });
+                  const anchorDate = addDays(end, -90);
+                  const anchor = slidingWindowTotal(exerciseId, anchorDate, 90) / (90 / 7);
+                  const monthsElapsed = 90 / 30;
+                  const target = anchor > 0 ? anchor * Math.pow(1.10, monthsElapsed) : 0;
+                  points.push({ date: isoDate(end), avg30, target });
               }
               return points;
           }
@@ -797,20 +808,20 @@
               const h = cssH - pad.t - pad.b;
               const n = pts.length;
 
-              const allVals = pts.flatMap(p => [p.avg30, p.baseline * 1.15, p.baseline]);
+              const allVals = pts.flatMap(p => [p.avg30, p.target * 1.15, p.target]);
               const maxV = Math.max(5, ...allVals) * 1.1;
 
               const toY = v => pad.t + h - (v / maxV) * h;
               const toX = i => pad.l + (i / (n - 1)) * w;
               pxPerWeek = w / (n - 1);
 
-              // green zone polygon (per-point 100%–115% of baseline)
-              const hasBaseline = pts.some(p => p.baseline > 0);
-              if (hasBaseline) {
+              // green zone polygon (per-point 100%–115% of projected target)
+              const hasTarget = pts.some(p => p.target > 0);
+              if (hasTarget) {
                   ctx.fillStyle = 'rgba(74,222,128,0.12)';
                   ctx.beginPath();
-                  for (let i = 0; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].baseline * 1.15));
-                  for (let i = n - 1; i >= 0; i--) ctx.lineTo(toX(i), toY(pts[i].baseline));
+                  for (let i = 0; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].target * 1.15));
+                  for (let i = n - 1; i >= 0; i--) ctx.lineTo(toX(i), toY(pts[i].target));
                   ctx.closePath();
                   ctx.fill();
 
@@ -820,14 +831,14 @@
                   ctx.lineWidth = 1;
                   ctx.beginPath();
                   for (let i = 0; i < n; i++) {
-                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].baseline));
-                      else ctx.lineTo(toX(i), toY(pts[i].baseline));
+                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].target));
+                      else ctx.lineTo(toX(i), toY(pts[i].target));
                   }
                   ctx.stroke();
                   ctx.beginPath();
                   for (let i = 0; i < n; i++) {
-                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].baseline * 1.15));
-                      else ctx.lineTo(toX(i), toY(pts[i].baseline * 1.15));
+                      if (i === 0) ctx.moveTo(toX(i), toY(pts[i].target * 1.15));
+                      else ctx.lineTo(toX(i), toY(pts[i].target * 1.15));
                   }
                   ctx.stroke();
                   ctx.setLineDash([]);
