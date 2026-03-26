@@ -784,15 +784,16 @@
           let maxZoneOffset = 0;
           let pxPerWeek = 8;
 
-          function zoneSeries(exerciseId, numWeeks, offsetWeeks) {
+          function zoneData(exerciseId, numWeeks, offsetWeeks) {
               const data = getAllDataForExercise(exerciseId);
               const dates = Object.keys(data).sort();
-              if (dates.length === 0) return [];
+              if (dates.length === 0) return { curve: [], band: [] };
 
               const firstDate = new Date(dates[0]);
               const today = new Date(todayStr());
               const endRef = addDays(today, -offsetWeeks * 7);
-              const windowStart = addDays(endRef, -(numWeeks - 1) * 7);
+              const numDays = numWeeks * 7;
+              const windowStart = addDays(endRef, -(numDays - 1));
 
               // Pre-compute running best for all weeks before the visible window
               const firstEligible = addDays(firstDate, 90);
@@ -805,11 +806,18 @@
                   if (avg90 > runningBest) runningBest = avg90;
               }
 
-              // Build visible points with running best continuing forward
-              const points = [];
+              // Daily curve: 30d avg/wk at each day
+              const curve = [];
+              for (let i = numDays - 1; i >= 0; i--) {
+                  const end = addDays(endRef, -i);
+                  const avg30 = slidingWindowTotal(exerciseId, end, 30) / (30 / 7);
+                  curve.push({ date: isoDate(end), value: avg30 });
+              }
+
+              // Weekly band: running-best target at each week
+              const band = [];
               for (let i = numWeeks - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i * 7);
-                  const avg30 = slidingWindowTotal(exerciseId, end, 30) / (30 / 7);
                   const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
                   let target = 0;
                   if (daysSinceFirst >= 90) {
@@ -817,9 +825,9 @@
                       if (avg90 > runningBest) runningBest = avg90;
                       target = runningBest;
                   }
-                  points.push({ date: isoDate(end), avg30, target });
+                  band.push({ date: isoDate(end), target });
               }
-              return points;
+              return { curve, band };
           }
 
           function computeZoneBounds() {
@@ -835,7 +843,8 @@
 
           function drawZoneChart() {
               computeZoneBounds();
-              const pts = zoneSeries(id, ZONE_WEEKS, zoneOffsetWeeks);
+              const { curve, band } = zoneData(id, ZONE_WEEKS, zoneOffsetWeeks);
+              if (curve.length === 0) return;
 
               const dpr = window.devicePixelRatio || 1;
               const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
@@ -849,36 +858,38 @@
               const pad = { l: 40, r: 8, t: 8, b: 24 };
               const w = cssW - pad.l - pad.r;
               const h = cssH - pad.t - pad.b;
-              const n = pts.length;
+              const nd = curve.length;
+              const nb = band.length;
 
-              const allVals = pts.flatMap(p => [p.avg30, p.target * 1.15, p.target]);
+              const allVals = curve.map(p => p.value)
+                  .concat(band.flatMap(p => [p.target * 1.15, p.target]));
               const maxV = Math.max(5, ...allVals) * 1.1;
 
               const toY = v => pad.t + h - (v / maxV) * h;
-              const toX = i => pad.l + (i / (n - 1)) * w;
-              pxPerWeek = w / (n - 1);
+              const curveX = i => pad.l + (i / (nd - 1)) * w;
+              const bandX = i => pad.l + (i / (nb - 1)) * w;
+              pxPerWeek = w / (nb - 1);
 
-              // green zone polygon (per-point 100%–115% of running-best target)
-              const first = pts.findIndex(p => p.target > 0);
+              // green zone polygon (weekly band, 100%–115% of running-best)
+              const first = band.findIndex(p => p.target > 0);
               if (first >= 0) {
                   ctx.fillStyle = 'rgba(74,222,128,0.12)';
                   ctx.beginPath();
-                  for (let i = first; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].target * 1.15));
-                  for (let i = n - 1; i >= first; i--) ctx.lineTo(toX(i), toY(pts[i].target));
+                  for (let i = first; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * 1.15));
+                  for (let i = nb - 1; i >= first; i--) ctx.lineTo(bandX(i), toY(band[i].target));
                   ctx.closePath();
                   ctx.fill();
 
-                  // zone boundary lines
                   ctx.setLineDash([4, 4]);
                   ctx.strokeStyle = 'rgba(74,222,128,0.4)';
                   ctx.lineWidth = 1;
                   ctx.beginPath();
-                  ctx.moveTo(toX(first), toY(pts[first].target));
-                  for (let i = first + 1; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].target));
+                  ctx.moveTo(bandX(first), toY(band[first].target));
+                  for (let i = first + 1; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target));
                   ctx.stroke();
                   ctx.beginPath();
-                  ctx.moveTo(toX(first), toY(pts[first].target * 1.15));
-                  for (let i = first + 1; i < n; i++) ctx.lineTo(toX(i), toY(pts[i].target * 1.15));
+                  ctx.moveTo(bandX(first), toY(band[first].target * 1.15));
+                  for (let i = first + 1; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * 1.15));
                   ctx.stroke();
                   ctx.setLineDash([]);
               }
@@ -900,36 +911,28 @@
               ctx.fillText('0', pad.l - 6, pad.t + h);
               ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
 
-              // 30d avg line
+              // 30d avg line (daily resolution)
               ctx.strokeStyle = barColor;
-              ctx.lineWidth = 2.5;
+              ctx.lineWidth = 2;
               ctx.beginPath();
-              for (let i = 0; i < n; i++) {
-                  const x = toX(i), y = toY(pts[i].avg30);
+              for (let i = 0; i < nd; i++) {
+                  const x = curveX(i), y = toY(curve[i].value);
                   if (i === 0) ctx.moveTo(x, y);
                   else ctx.lineTo(x, y);
               }
               ctx.stroke();
-
-              // data points
-              ctx.fillStyle = barColor;
-              for (let i = 0; i < n; i++) {
-                  ctx.beginPath();
-                  ctx.arc(toX(i), toY(pts[i].avg30), 3, 0, Math.PI * 2);
-                  ctx.fill();
-              }
 
               // x labels
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
               ctx.font = '10px -apple-system, system-ui, Arial';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              const step = Math.max(1, Math.ceil(n / 6));
-              for (let i = 0; i < n; i += step) {
-                  ctx.fillText(pts[i].date.slice(5), toX(i), pad.t + h + 5);
+              const step = Math.max(1, Math.ceil(nd / 6));
+              for (let i = 0; i < nd; i += step) {
+                  ctx.fillText(curve[i].date.slice(5), curveX(i), pad.t + h + 5);
               }
 
-              $label.textContent = `30d avg/wk  \u2014  ${pts[0].date} \u2192 ${pts[n - 1].date}`;
+              $label.textContent = `30d avg/wk  \u2014  ${curve[0].date} \u2192 ${curve[nd - 1].date}`;
           }
 
           function drawActiveChart() {
