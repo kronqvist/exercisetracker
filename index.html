@@ -95,6 +95,13 @@
       .dash-spark-bar { width:4px; border-radius:1px; min-height:1px; }
       .dash-ex-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
+      /* --- Zone dot --- */
+      .tile-zone { position:absolute; top:8px; right:8px; width:8px; height:8px; border-radius:50%; }
+      .zone-green { background:#4ade80; }
+      .zone-under { background:#60a5fa; }
+      .zone-over  { background:#fbbf24; }
+      .zone-grey  { background:rgba(232,232,240,.25); }
+
       /* --- Animations --- */
       .fade { animation: fade .2s ease; } @keyframes fade{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
       html, body { touch-action: manipulation; }
@@ -123,6 +130,8 @@
         "hip-adduction": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v8"/><path d="M16 16l-6 8"/><path d="M16 16l6 8"/><path d="M7 20l5-1" stroke-dasharray="2 2"/><path d="M25 20l-5-1" stroke-dasharray="2 2"/>`),
         "rubber-band-archer": _s(`<circle cx="10" cy="8" r="3"/><path d="M10 11v7"/><path d="M10 18l-4 6"/><path d="M10 18l4 6"/><path d="M10 13l14-2" stroke-dasharray="3 2"/><path d="M10 13h5"/>`),
         "rubber-band-row": _s(`<circle cx="20" cy="8" r="3"/><path d="M20 11v7"/><path d="M20 18l-4 6"/><path d="M20 18l4 6"/><path d="M20 13l-12 0" stroke-dasharray="3 2"/><path d="M20 13l-5 0"/>`),
+        "banded-air-cycling": _s(`<circle cx="16" cy="8" r="3"/><path d="M16 11v5"/><path d="M16 16l-5 4"/><path d="M11 20l2 5"/><path d="M16 16l5-1"/><path d="M21 15l-1 6"/><ellipse cx="16" cy="22" rx="8" ry="3" stroke-dasharray="3 2"/>`),
+        "sprint-pull": _s(`<circle cx="14" cy="5" r="3"/><path d="M14 8v7"/><path d="M14 15l-5 7"/><path d="M14 15l6 5"/><path d="M14 11l8-2" stroke-dasharray="3 2"/><path d="M14 11l-6 1"/>`),
         "running": _s(`<circle cx="18" cy="5" r="3"/><path d="M18 8l-2 7"/><path d="M16 15l-6 6"/><path d="M16 15l7 4"/><path d="M18 8l5 4"/><path d="M16 15l-7-2"/>`),
         "swimming": _s(`<circle cx="8" cy="14" r="3"/><path d="M11 14h14"/><path d="M25 14l-3-4"/><path d="M8 17l4 4"/><path d="M4 22q4-3 8 0t8 0 8 0"/>`),
         "skiing": _s(`<circle cx="16" cy="5" r="3"/><path d="M16 8v8"/><path d="M16 16l-5 8"/><path d="M16 16l5 8"/><path d="M10 8l-4 12"/><path d="M22 8l4 12"/><path d="M4 26l24-4"/>`),
@@ -282,6 +291,16 @@
           return total / (days / 7);
       }
 
+      function progressZone(id) {
+          const baseline = avgWeeklyVolume(id, 90);
+          if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
+          const recent = avgWeeklyVolume(id, 30);
+          const ratio = recent / baseline;
+          if (ratio < 1.05) return { cls: 'zone-under', label: `${Math.round(ratio*100)}% of baseline — increase` };
+          if (ratio <= 1.15) return { cls: 'zone-green', label: `${Math.round(ratio*100)}% of baseline — green zone` };
+          return { cls: 'zone-over', label: `${Math.round(ratio*100)}% of baseline — back off` };
+      }
+
       function bestWeekEver(id) {
           const data = getAllDataForExercise(id);
           const dates = Object.keys(data).sort();
@@ -429,8 +448,10 @@
               const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
               const c = isNaN(count) ? 0 : count;
               const done = isOnTrack(x.id, x.dpw);
+              const zone = progressZone(x.id);
               html += `
       <a class="tile${done?' done':''}" href="#${x.id}" aria-label="${x.name}" style="--tile-accent:${CLR_MAP[x.clr]}">
+        <span class="tile-zone ${zone.cls}" title="${zone.label}"></span>
         <span style="color:${CLR_MAP[x.clr]}">${ICONS[x.id] || ''}</span>
         <div class="tile-name">${x.name}</div>
         <div class="tile-unit">${x.unit}</div>
@@ -483,7 +504,10 @@
       <div class="note" id="status">Saved</div>
 
       <div class="chart-wrap">
-        <div class="muted" id="rangeLabel" style="margin:0 0 8px;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 8px">
+          <div class="muted" id="rangeLabel"></div>
+          <button class="toolbar-btn" id="chart-toggle" style="padding:4px 10px;font-size:11px">Zone</button>
+        </div>
         <canvas id="chart" width="600" height="200"></canvas>
       </div>
 
@@ -498,7 +522,9 @@
           const $day    = document.getElementById('day');
           const $chart  = document.getElementById('chart');
           const $label  = document.getElementById('rangeLabel');
+          const $toggle = document.getElementById('chart-toggle');
           const $stats  = document.getElementById('stats');
+          let chartMode = 'history';
 
           const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.5';},250); };
 
@@ -555,14 +581,14 @@
               $notes.value = n;
               showSaved();
               computeBounds();
-              drawHistory();
+              drawActiveChart();
               updateStats();
           }
           function saveCount(dateStr, n) {
               localStorage.setItem(storage(dateStr).count, String(n));
               showSaved();
               computeBounds();
-              drawHistory();
+              drawActiveChart();
               updateStats();
           }
           function saveNotes(dateStr, v) {
@@ -721,11 +747,144 @@
               $label.textContent = `${startISO}  \u2192  ${eISO}`;
           }
 
+          /* --- zone chart: rolling 30d avg/wk with green zone band --- */
+          function rollingAvgSeries(exerciseId, windowDays, numPoints) {
+              const today = new Date(todayStr());
+              const points = [];
+              for (let i = numPoints - 1; i >= 0; i--) {
+                  const end = addDays(today, -i * 7);
+                  const total = slidingWindowTotal(exerciseId, end, windowDays);
+                  const avg = total / (windowDays / 7);
+                  points.push({ date: isoDate(end), value: avg });
+              }
+              return points;
+          }
+
+          function drawZoneChart() {
+              const weeks = 13;
+              const recent = rollingAvgSeries(id, 30, weeks);
+              const baseline90 = avgWeeklyVolume(id, 90);
+
+              const dpr = window.devicePixelRatio || 1;
+              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
+              $chart.width = Math.round(cssW * dpr);
+              $chart.height = Math.round(cssH * dpr);
+
+              const ctx = $chart.getContext('2d');
+              ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+              ctx.clearRect(0, 0, cssW, cssH);
+
+              const pad = { l: 40, r: 8, t: 8, b: 24 };
+              const w = cssW - pad.l - pad.r;
+              const h = cssH - pad.t - pad.b;
+
+              const zoneLow = baseline90 * 1.05;
+              const zoneHigh = baseline90 * 1.15;
+              const allVals = recent.map(p => p.value).concat([zoneHigh, zoneLow, baseline90]);
+              const maxV = Math.max(5, ...allVals) * 1.1;
+
+              const toY = v => pad.t + h - (v / maxV) * h;
+              const toX = i => pad.l + (i / (weeks - 1)) * w;
+
+              // green zone band
+              if (baseline90 > 0) {
+                  ctx.fillStyle = 'rgba(74,222,128,0.12)';
+                  ctx.fillRect(pad.l, toY(zoneHigh), w, toY(zoneLow) - toY(zoneHigh));
+
+                  // zone boundary lines
+                  ctx.setLineDash([4, 4]);
+                  ctx.strokeStyle = 'rgba(74,222,128,0.4)';
+                  ctx.lineWidth = 1;
+                  ctx.beginPath();
+                  ctx.moveTo(pad.l, toY(zoneLow));
+                  ctx.lineTo(pad.l + w, toY(zoneLow));
+                  ctx.moveTo(pad.l, toY(zoneHigh));
+                  ctx.lineTo(pad.l + w, toY(zoneHigh));
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+
+                  // 90d baseline reference line
+                  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([2, 3]);
+                  ctx.beginPath();
+                  ctx.moveTo(pad.l, toY(baseline90));
+                  ctx.lineTo(pad.l + w, toY(baseline90));
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+              }
+
+              // axes
+              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pad.l, pad.t);
+              ctx.lineTo(pad.l, pad.t + h);
+              ctx.lineTo(pad.l + w, pad.t + h);
+              ctx.stroke();
+
+              // y ticks
+              ctx.fillStyle = 'rgba(255,255,255,0.45)';
+              ctx.font = '11px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('0', pad.l - 6, pad.t + h);
+              ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
+              if (baseline90 > 0) {
+                  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                  ctx.fillText(String(Math.round(baseline90)), pad.l - 6, toY(baseline90));
+              }
+
+              // 30d avg line
+              ctx.strokeStyle = barColor;
+              ctx.lineWidth = 2.5;
+              ctx.beginPath();
+              for (let i = 0; i < recent.length; i++) {
+                  const x = toX(i), y = toY(recent[i].value);
+                  if (i === 0) ctx.moveTo(x, y);
+                  else ctx.lineTo(x, y);
+              }
+              ctx.stroke();
+
+              // data points
+              for (let i = 0; i < recent.length; i++) {
+                  const x = toX(i), y = toY(recent[i].value);
+                  ctx.beginPath();
+                  ctx.arc(x, y, 3, 0, Math.PI * 2);
+                  ctx.fillStyle = barColor;
+                  ctx.fill();
+              }
+
+              // x labels
+              ctx.fillStyle = 'rgba(255,255,255,0.4)';
+              ctx.font = '10px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'top';
+              const step = Math.max(1, Math.ceil(weeks / 5));
+              for (let i = 0; i < weeks; i += step) {
+                  ctx.fillText(recent[i].date.slice(5), toX(i), pad.t + h + 5);
+              }
+
+              $label.textContent = `30d avg/wk  \u2014  ${recent[0].date} \u2192 ${recent[recent.length - 1].date}`;
+          }
+
+          function drawActiveChart() {
+              if (chartMode === 'zone') drawZoneChart();
+              else drawHistory();
+          }
+
+          $toggle.addEventListener('click', () => {
+              chartMode = chartMode === 'history' ? 'zone' : 'history';
+              $toggle.textContent = chartMode === 'history' ? 'Zone' : 'Daily';
+              drawActiveChart();
+          });
+
           // --- interactions ---
           let dragging = false;
           let startX = 0;
 
           $chart.addEventListener('pointerdown', (e) => {
+              if (chartMode !== 'history') return;
               dragging = true;
               startX = e.clientX;
               $chart.setPointerCapture(e.pointerId);
@@ -752,6 +911,7 @@
           $chart.addEventListener('pointerleave', endDrag);
 
           $chart.addEventListener('wheel', (e) => {
+              if (chartMode !== 'history') return;
               e.preventDefault();
               const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
               offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
@@ -759,6 +919,7 @@
           }, {passive:false});
 
           const onKey = (e) => {
+              if (chartMode !== 'history') return;
               if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
               if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
           };
@@ -766,9 +927,9 @@
 
           // init
           computeBounds();
-          drawHistory();
+          drawActiveChart();
           updateStats();
-          addEventListener('resize', drawHistory, {passive:true});
+          addEventListener('resize', drawActiveChart, {passive:true});
 
           (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.5'; })();
       }
