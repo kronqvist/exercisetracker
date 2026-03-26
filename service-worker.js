@@ -1,4 +1,4 @@
-const APP_VERSION = '2026-03-26-6';
+const APP_VERSION = '2026-03-26-7';
 const CACHE = `static-${APP_VERSION}`;
 const ASSETS = [
   "./",
@@ -22,6 +22,11 @@ self.addEventListener("activate", (e) => {
     )
   );
   self.clients.claim();
+});
+
+// Message: respond with version
+self.addEventListener("message", (e) => {
+  if (e.data === "GET_VERSION") e.source.postMessage({ version: APP_VERSION });
 });
 
 // Fetch: serve from cache, fall back to network

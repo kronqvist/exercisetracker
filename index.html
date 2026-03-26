@@ -478,10 +478,22 @@
       </a>`;
           }
           if (gridOpen) html += '</div>';
+          html += `<div class="muted" id="app-version" style="text-align:center;margin-top:24px"></div>`;
 
           app.innerHTML = html;
           document.getElementById('btn-export').addEventListener('click', exportData);
           document.getElementById('btn-import').addEventListener('click', importData);
+
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.addEventListener('message', function handler(e) {
+                  if (e.data && e.data.version) {
+                      const el = document.getElementById('app-version');
+                      if (el) el.textContent = 'v' + e.data.version;
+                      navigator.serviceWorker.removeEventListener('message', handler);
+                  }
+              });
+              navigator.serviceWorker.controller.postMessage('GET_VERSION');
+          }
       }
 
       /* ---------- DETAIL ---------- */
