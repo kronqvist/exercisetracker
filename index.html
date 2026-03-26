@@ -748,23 +748,6 @@
               }
               ctx.globalAlpha = 1;
 
-              // 7-day SMA trend line
-              if (values.length >= 7) {
-                  ctx.strokeStyle = 'rgba(251,191,36,0.8)';
-                  ctx.lineWidth = 2;
-                  ctx.beginPath();
-                  let started = false;
-                  for (let i = 6; i < values.length; i++) {
-                      let sum = 0;
-                      for (let j = i - 6; j <= i; j++) sum += values[j];
-                      const avg = sum / 7;
-                      const x = startX + i * (barW + barGap) + barW / 2;
-                      const y = pad.t + h - (avg / maxV) * h;
-                      if (!started) { ctx.moveTo(x, y); started = true; }
-                      else ctx.lineTo(x, y);
-                  }
-                  ctx.stroke();
-              }
 
               // x labels
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
