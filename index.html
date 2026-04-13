@@ -249,10 +249,6 @@
           return total;
       }
 
-      function getAllTimeTotal(id) {
-          const data = getAllDataForExercise(id);
-          return Object.values(data).reduce((s, v) => s + v, 0);
-      }
 
       function slidingWindowTotal(id, endDate, days) {
           let total = 0;
@@ -484,18 +480,23 @@
       let slideDirection = null;
 
       function setupSwipe(cardEl) {
-          let sx = 0, sy = 0, st = 0;
-          cardEl.addEventListener('pointerdown', (e) => {
+          let sx = 0, sy = 0, st = 0, lx = 0, ly = 0, active = false;
+          cardEl.style.touchAction = 'pan-y';
+          cardEl.addEventListener('touchstart', (e) => {
               if (e.target.closest('canvas, button, input')) return;
-              sx = e.clientX; sy = e.clientY; st = Date.now();
+              const t = e.touches[0];
+              sx = lx = t.clientX; sy = ly = t.clientY; st = Date.now(); active = true;
           }, {passive:true});
-          cardEl.addEventListener('pointerup', (e) => {
-              if (st === 0) return;
-              const dx = e.clientX - sx;
-              const dy = e.clientY - sy;
-              const dt = Date.now() - st;
-              st = 0;
-              if (Math.abs(dx) > 60 && Math.abs(dy) < 50 && dt < 400) {
+          cardEl.addEventListener('touchmove', (e) => {
+              if (!active) return;
+              const t = e.touches[0];
+              lx = t.clientX; ly = t.clientY;
+          }, {passive:true});
+          cardEl.addEventListener('touchend', () => {
+              if (!active) return;
+              active = false;
+              const dx = lx - sx, dy = ly - sy, dt = Date.now() - st;
+              if (Math.abs(dx) > 50 && Math.abs(dy) < 60 && dt < 500) {
                   const dir = dx > 0 ? -1 : 1;
                   const hash = location.hash.replace(/^#/, '');
                   const idx = EXERCISES.findIndex(ex => ex.id === hash);
@@ -587,7 +588,9 @@
               const streak = getStreak(id);
               const thisWeek = getWeekTotal(id, 0);
               const lastWeek = getWeekTotal(id, 1);
-              const total = getAllTimeTotal(id);
+              const allData = getAllDataForExercise(id);
+              const daysRecorded = Object.keys(allData).length;
+              const total = Object.values(allData).reduce((s, v) => s + v, 0);
               const avg30 = avgWeeklyVolume(id, 30);
               const avg90 = avgWeeklyVolume(id, 90);
               const bestWk = bestWeekEver(id);
@@ -617,6 +620,7 @@
                 <div class="stat"><div class="stat-val">${formatAvg(avg90)}</div><div class="stat-label">90d avg/wk</div></div>
                 <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
                 <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
+                <div class="stat"><div class="stat-val">${daysRecorded}</div><div class="stat-label">Days recorded</div></div>
                 <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
               `;
           }
