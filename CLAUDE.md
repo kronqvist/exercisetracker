@@ -30,6 +30,14 @@ Remaining deficits: left gluteus medius and deep rotators still hypertonic. Left
 
 Treatment: myofascial release (QL, glutes, deep hip rotators, TFL, iliopsoas, inguinal area — all left), manual hip traction for tendon passage clearance. Recommended: hip thrusters, alternating air cycling with band around feet, banded hip flexion.
 
+### MR 2026-04-13 — Lumbar Spine, Pelvis, Hips, SI Joints
+
+Compared against MR from 2024-10-02; essentially unchanged.
+
+**Lumbar spine:** Straightened lordosis. Discs L3-S1 degeneratively dehydrated; L5-S1 markedly reduced height with surrounding Modic type 1 changes. L3-L5: minor annular fissures and flat median disc bulges without nerve root involvement. L5-S1: degenerated, broad-based disc bulge. No root compression, no disc herniation, no spinal stenosis. Conus normal. Root canals without narrowing. No anterior spondylitis. No malignancy.
+
+**Pelvis/hips/SI joints:** No arthrosis or arthritis in the hip joints. Sacroiliac joints appear normal without ankylosing changes, erosions, or surrounding bone marrow oedema. No sacroiliitis.
+
 ### Prescribed Rehabilitation Objectives
 
 1. **Inhibition:** Myofascial release of deep hip rotators and gluteus medius to reduce neural irritation. Self-pressure with tennis ball on glute musculature.

@@ -260,10 +260,25 @@
           return total;
       }
 
-      function avgWeeklyVolume(id, days) {
-          const today = new Date(todayStr());
-          const total = slidingWindowTotal(id, today, days);
-          return total / (days / 7);
+
+      const EWMA_HALF_LIFE = 21;
+      const EWMA_LOOKBACK = EWMA_HALF_LIFE * 4;
+      const EWMA_LAMBDA = Math.LN2 / EWMA_HALF_LIFE;
+
+      function ewmaWeeklyAt(data, endDate) {
+          let wSum = 0, wTotal = 0;
+          for (let i = 0; i < EWMA_LOOKBACK; i++) {
+              const ds = isoDate(addDays(endDate, -i));
+              const v = data[ds] || 0;
+              const w = Math.exp(-EWMA_LAMBDA * i);
+              wSum += w * v;
+              wTotal += w;
+          }
+          return (wSum / wTotal) * 7;
+      }
+
+      function ewmaWeekly(id) {
+          return ewmaWeeklyAt(getAllDataForExercise(id), new Date(todayStr()));
       }
 
       function bestAvg90(id) {
@@ -286,7 +301,7 @@
       function progressZone(id) {
           const baseline = bestAvg90(id);
           if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
-          const recent = avgWeeklyVolume(id, 30);
+          const recent = ewmaWeekly(id);
           const ratio = recent / baseline;
           const pct = Math.round(ratio * 100);
           if (ratio < 1.00) return { cls: 'zone-grey', label: `${pct}% of peak` };
@@ -585,20 +600,16 @@
           }
 
           function updateStats() {
-              const streak = getStreak(id);
+              const allData = getAllDataForExercise(id);
+              const sortedDates = Object.keys(allData).sort();
+              const daysRecorded = sortedDates.length;
+              const total = Object.values(allData).reduce((s, v) => s + v, 0);
+              const startDate = sortedDates.length > 0 ? sortedDates[0] : null;
+
+              // Current performance
               const thisWeek = getWeekTotal(id, 0);
               const lastWeek = getWeekTotal(id, 1);
-              const allData = getAllDataForExercise(id);
-              const daysRecorded = Object.keys(allData).length;
-              const total = Object.values(allData).reduce((s, v) => s + v, 0);
-              const avg30 = avgWeeklyVolume(id, 30);
-              const avg90 = avgWeeklyVolume(id, 90);
-              const bestWk = bestWeekEver(id);
               const arrow = trendArrow(thisWeek, lastWeek);
-              const zoneBase = bestAvg90(id);
-              const zoneLow = Math.floor(zoneBase);
-              const zoneHigh = Math.ceil(zoneBase * 1.15);
-
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
               if (pooledDpw !== undefined) {
@@ -611,17 +622,29 @@
                   freqLabel = `${ex.dpw}x/wk`;
               }
 
+              // Trends
+              const ewma = ewmaWeeklyAt(allData, new Date(todayStr()));
+              const zoneBase = bestAvg90(id);
+              const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
+              const zoneLow = Math.floor(zoneBase);
+              const zoneHigh = Math.ceil(zoneBase * 1.15);
+
+              // History
+              const streak = getStreak(id);
+              const bestWk = bestWeekEver(id);
+
               $stats.innerHTML = `
-                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak</div></div>
-                <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
+                <div class="stat"><div class="stat-val">${zonePct !== null ? zonePct + '%' : '\u2014'}</div><div class="stat-label">Zone position</div></div>
                 <div class="stat"><div class="stat-val">${weekDays}/${targetDpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
                 <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
-                <div class="stat"><div class="stat-val">${formatAvg(avg30)}</div><div class="stat-label">30d avg/wk</div></div>
-                <div class="stat"><div class="stat-val">${formatAvg(avg90)}</div><div class="stat-label">90d avg/wk</div></div>
+                <div class="stat"><div class="stat-val">${formatAvg(ewma)}</div><div class="stat-label">EWMA/wk</div></div>
+                <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
+                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak</div></div>
+                <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
                 <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
                 <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
                 <div class="stat"><div class="stat-val">${daysRecorded}</div><div class="stat-label">Days recorded</div></div>
-                <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
+                <div class="stat"><div class="stat-val">${startDate || '\u2014'}</div><div class="stat-label">Since</div></div>
               `;
           }
 
@@ -783,7 +806,7 @@
               $label.textContent = `${startISO}  \u2192  ${eISO}`;
           }
 
-          /* --- zone chart: rolling 30d avg/wk with per-point green zone --- */
+          /* --- zone chart: EWMA weekly volume with green zone band --- */
           const ZONE_WEEKS = 26;
           let zoneOffsetWeeks = 0;
           let maxZoneOffset = 0;
@@ -811,12 +834,11 @@
                   if (avg90 > runningBest) runningBest = avg90;
               }
 
-              // Daily curve: 30d avg/wk at each day
+              // Daily curve: EWMA weekly volume at each day
               const curve = [];
               for (let i = numDays - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i);
-                  const avg30 = slidingWindowTotal(exerciseId, end, 30) / (30 / 7);
-                  curve.push({ date: isoDate(end), value: avg30 });
+                  curve.push({ date: isoDate(end), value: ewmaWeeklyAt(data, end) });
               }
 
               // Weekly band: running-best target at each week
@@ -937,7 +959,7 @@
                   ctx.fillText(curve[i].date.slice(5), curveX(i), pad.t + h + 5);
               }
 
-              $label.textContent = `30d avg/wk  \u2014  ${curve[0].date} \u2192 ${curve[nd - 1].date}`;
+              $label.textContent = `EWMA/wk  \u2014  ${curve[0].date} \u2192 ${curve[nd - 1].date}`;
           }
 
           function drawActiveChart() {
