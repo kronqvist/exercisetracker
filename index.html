@@ -256,16 +256,28 @@
       const EWMA_LOOKBACK = EWMA_HALF_LIFE * 4;
       const EWMA_LAMBDA = Math.LN2 / EWMA_HALF_LIFE;
 
-      function ewmaWeeklyAt(data, endDate) {
+      const BASELINE_HALF_LIFE = 60;
+      const BASELINE_LOOKBACK = BASELINE_HALF_LIFE * 4;
+      const BASELINE_LAMBDA = Math.LN2 / BASELINE_HALF_LIFE;
+
+      function ewmaAt(data, endDate, lambda, lookback) {
           let wSum = 0, wTotal = 0;
-          for (let i = 0; i < EWMA_LOOKBACK; i++) {
+          for (let i = 0; i < lookback; i++) {
               const ds = isoDate(addDays(endDate, -i));
               const v = data[ds] || 0;
-              const w = Math.exp(-EWMA_LAMBDA * i);
+              const w = Math.exp(-lambda * i);
               wSum += w * v;
               wTotal += w;
           }
           return (wSum / wTotal) * 7;
+      }
+
+      function ewmaWeeklyAt(data, endDate) {
+          return ewmaAt(data, endDate, EWMA_LAMBDA, EWMA_LOOKBACK);
+      }
+
+      function baselineAt(data, endDate) {
+          return ewmaAt(data, endDate, BASELINE_LAMBDA, BASELINE_LOOKBACK);
       }
 
       function ewmaWeekly(id) {
@@ -301,10 +313,10 @@
           if (dates.length === 0) return 0;
           const today = new Date(todayStr());
           const span = daysBetween(dates[0], todayStr());
-          if (span < EWMA_LOOKBACK) return 0;
+          if (span < BASELINE_LOOKBACK) return 0;
           let best = 0;
-          for (let d = 0; d <= span - EWMA_LOOKBACK; d++) {
-              const val = ewmaWeeklyAt(data, addDays(today, -d));
+          for (let d = 0; d <= span - BASELINE_LOOKBACK; d++) {
+              const val = baselineAt(data, addDays(today, -d));
               if (val > best) best = val;
           }
           return best;
@@ -839,14 +851,14 @@
               const numDays = numWeeks * 7;
               const windowStart = addDays(endRef, -(numDays - 1));
 
-              // Pre-compute running best EWMA for all days before the visible window
-              const firstEligible = addDays(firstDate, EWMA_LOOKBACK);
+              // Pre-compute running best baseline EWMA for all days before the visible window
+              const firstEligible = addDays(firstDate, BASELINE_LOOKBACK);
               let runningBest = 0;
               const preDays = Math.max(0, daysBetween(isoDate(firstEligible), isoDate(windowStart)));
               for (let d = 0; d <= preDays; d++) {
                   const end = addDays(firstEligible, d);
                   if (end > windowStart) break;
-                  const val = ewmaWeeklyAt(data, end);
+                  const val = baselineAt(data, end);
                   if (val > runningBest) runningBest = val;
               }
 
@@ -863,8 +875,8 @@
                   const end = addDays(endRef, -i * 7);
                   const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
                   let target = 0;
-                  if (daysSinceFirst >= EWMA_LOOKBACK) {
-                      const val = ewmaWeeklyAt(data, end);
+                  if (daysSinceFirst >= BASELINE_LOOKBACK) {
+                      const val = baselineAt(data, end);
                       if (val > runningBest) runningBest = val;
                       target = runningBest;
                   }

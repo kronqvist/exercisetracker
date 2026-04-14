@@ -52,11 +52,14 @@ Overcome the biomechanical issues described above and become overall stronger. A
 
 Volume must rise, but slowly; the body adapts on its own schedule. The green zone algorithm honours this by anchoring to proven capability rather than recent activity.
 
-All metrics use an exponentially weighted moving average (EWMA) with a 21-day half-life, normalised to weekly volume. The EWMA weights recent days more heavily and has no sharp cutoff; old data fades gradually rather than dropping out of a window.
+Two EWMA time scales, both normalised to weekly volume:
 
-The baseline is `bestEwma(id)`: the highest EWMA weekly volume ever recorded for a given exercise. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. Growth incentive is structural: consistently training above your best EWMA eventually produces a new peak, and the ratchet clicks forward. A minimum of 84 days (4x half-life) of data is required before the baseline activates.
+- **Display EWMA** (21-day half-life, 84-day lookback): the blue curve on the zone chart and the "EWMA/wk" stat. Responsive to recent changes, shows current training state.
+- **Baseline EWMA** (60-day half-life, 240-day lookback): used only for green zone calculation. Sluggish by design; short bursts of intense training barely move it. Only sustained, consistent volume over months can shift the baseline upward.
 
-Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestEwma()`. The chart plots the daily EWMA against a green band that steps upward only when a new peak EWMA forms.
+The baseline is `bestEwma(id)`: the highest baseline-EWMA weekly volume ever recorded for a given exercise. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. A minimum of 240 days of data is required before the baseline activates.
+
+Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestEwma()`. The chart plots the daily display-EWMA against a green band derived from the running-best baseline-EWMA.
 
 ## Critical Rules
 
