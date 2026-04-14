@@ -281,6 +281,29 @@
           return ewmaWeeklyAt(getAllDataForExercise(id), new Date(todayStr()));
       }
 
+      function linRegSlope(ys) {
+          const n = ys.length;
+          if (n < 2) return 0;
+          let sx = 0, sy = 0, sxy = 0, sxx = 0;
+          for (let i = 0; i < n; i++) {
+              sx += i; sy += ys[i]; sxy += i * ys[i]; sxx += i * i;
+          }
+          const denom = n * sxx - sx * sx;
+          if (denom === 0) return 0;
+          return (n * sxy - sx * sy) / denom;
+      }
+
+      function volumeTrend(id, days) {
+          const data = getAllDataForExercise(id);
+          const today = new Date(todayStr());
+          const vals = [];
+          for (let i = days - 1; i >= 0; i--) {
+              vals.push(ewmaWeeklyAt(data, addDays(today, -i)));
+          }
+          const slopePerDay = linRegSlope(vals);
+          return slopePerDay * 30;
+      }
+
       function bestAvg90(id) {
           const data = getAllDataForExercise(id);
           const dates = Object.keys(data).sort();
@@ -628,6 +651,9 @@
               const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
               const zoneLow = Math.floor(zoneBase);
               const zoneHigh = Math.ceil(zoneBase * 1.15);
+              const trend90 = volumeTrend(id, 90);
+              const trendSign = trend90 > 0.5 ? '+' : trend90 < -0.5 ? '' : '\u00b1';
+              const trendVal = Math.abs(trend90) < 0.5 ? '0' : formatAvg(trend90);
 
               // History
               const streak = getStreak(id);
@@ -638,6 +664,7 @@
                 <div class="stat"><div class="stat-val">${weekDays}/${targetDpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
                 <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
                 <div class="stat"><div class="stat-val">${formatAvg(ewma)}</div><div class="stat-label">EWMA/wk</div></div>
+                <div class="stat"><div class="stat-val">${trendSign}${trendVal}</div><div class="stat-label">Trend/mo</div></div>
                 <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
                 <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak</div></div>
                 <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
@@ -938,7 +965,7 @@
               ctx.fillText('0', pad.l - 6, pad.t + h);
               ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
 
-              // 30d avg line (daily resolution)
+              // EWMA line (daily resolution)
               ctx.strokeStyle = barColor;
               ctx.lineWidth = 2;
               ctx.beginPath();
@@ -948,6 +975,24 @@
                   else ctx.lineTo(x, y);
               }
               ctx.stroke();
+
+              // trend line (linear regression over visible curve)
+              if (nd >= 14) {
+                  const vals = curve.map(p => p.value);
+                  const slope = linRegSlope(vals);
+                  const mean = vals.reduce((a, b) => a + b, 0) / nd;
+                  const midX = (nd - 1) / 2;
+                  const y0 = mean - slope * midX;
+                  const y1 = mean + slope * (nd - 1 - midX);
+                  ctx.setLineDash([6, 4]);
+                  ctx.strokeStyle = slope > 0 ? 'rgba(74,222,128,0.6)' : slope < 0 ? 'rgba(248,113,113,0.6)' : 'rgba(255,255,255,0.3)';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  ctx.moveTo(curveX(0), toY(y0));
+                  ctx.lineTo(curveX(nd - 1), toY(y1));
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+              }
 
               // x labels
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
