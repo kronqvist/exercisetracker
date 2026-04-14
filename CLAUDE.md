@@ -52,9 +52,11 @@ Overcome the biomechanical issues described above and become overall stronger. A
 
 Volume must rise, but slowly; the body adapts on its own schedule. The green zone algorithm honours this by anchoring to proven capability rather than recent activity.
 
-The baseline is `bestAvg90(id)`: the highest 90-day weekly average ever recorded for a given exercise. This value can only ratchet upward. Idle periods cannot erode it; short bursts cannot inflate it (90 days of sustained volume are required to shift it). The green zone spans 100 to 115 % of this peak baseline. Growth incentive is structural: consistently training at 110 % of your best eventually produces a new best window, and the ratchet clicks forward.
+All metrics use an exponentially weighted moving average (EWMA) with a 21-day half-life, normalised to weekly volume. The EWMA weights recent days more heavily and has no sharp cutoff; old data fades gradually rather than dropping out of a window.
 
-Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestAvg90()`. The chart plots the rolling 30-day weekly average against a flat green band that steps upward only when a new peak 90-day window forms.
+The baseline is `bestEwma(id)`: the highest EWMA weekly volume ever recorded for a given exercise. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. Growth incentive is structural: consistently training above your best EWMA eventually produces a new peak, and the ratchet clicks forward. A minimum of 84 days (4x half-life) of data is required before the baseline activates.
+
+Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestEwma()`. The chart plots the daily EWMA against a green band that steps upward only when a new peak EWMA forms.
 
 ## Critical Rules
 

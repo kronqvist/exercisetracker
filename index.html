@@ -250,15 +250,6 @@
       }
 
 
-      function slidingWindowTotal(id, endDate, days) {
-          let total = 0;
-          for (let i = 0; i < days; i++) {
-              const ds = isoDate(addDays(endDate, -i));
-              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-              if (!isNaN(v)) total += v;
-          }
-          return total;
-      }
 
 
       const EWMA_HALF_LIFE = 21;
@@ -304,25 +295,23 @@
           return slopePerDay * 30;
       }
 
-      function bestAvg90(id) {
+      function bestEwma(id) {
           const data = getAllDataForExercise(id);
           const dates = Object.keys(data).sort();
           if (dates.length === 0) return 0;
           const today = new Date(todayStr());
           const span = daysBetween(dates[0], todayStr());
-          if (span < 90) return 0;
+          if (span < EWMA_LOOKBACK) return 0;
           let best = 0;
-          for (let d = 0; d <= span - 90; d++) {
-              const end = addDays(today, -d);
-              const total = slidingWindowTotal(id, end, 90);
-              const avg = total / (90 / 7);
-              if (avg > best) best = avg;
+          for (let d = 0; d <= span - EWMA_LOOKBACK; d++) {
+              const val = ewmaWeeklyAt(data, addDays(today, -d));
+              if (val > best) best = val;
           }
           return best;
       }
 
       function progressZone(id) {
-          const baseline = bestAvg90(id);
+          const baseline = bestEwma(id);
           if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
           const recent = ewmaWeekly(id);
           const ratio = recent / baseline;
@@ -647,7 +636,7 @@
 
               // Trends
               const ewma = ewmaWeeklyAt(allData, new Date(todayStr()));
-              const zoneBase = bestAvg90(id);
+              const zoneBase = bestEwma(id);
               const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
               const zoneLow = Math.floor(zoneBase);
               const zoneHigh = Math.ceil(zoneBase * 1.15);
@@ -850,15 +839,15 @@
               const numDays = numWeeks * 7;
               const windowStart = addDays(endRef, -(numDays - 1));
 
-              // Pre-compute running best for all days before the visible window
-              const firstEligible = addDays(firstDate, 90);
+              // Pre-compute running best EWMA for all days before the visible window
+              const firstEligible = addDays(firstDate, EWMA_LOOKBACK);
               let runningBest = 0;
               const preDays = Math.max(0, daysBetween(isoDate(firstEligible), isoDate(windowStart)));
               for (let d = 0; d <= preDays; d++) {
                   const end = addDays(firstEligible, d);
                   if (end > windowStart) break;
-                  const avg90 = slidingWindowTotal(exerciseId, end, 90) / (90 / 7);
-                  if (avg90 > runningBest) runningBest = avg90;
+                  const val = ewmaWeeklyAt(data, end);
+                  if (val > runningBest) runningBest = val;
               }
 
               // Daily curve: EWMA weekly volume at each day
@@ -868,15 +857,15 @@
                   curve.push({ date: isoDate(end), value: ewmaWeeklyAt(data, end) });
               }
 
-              // Weekly band: running-best target at each week
+              // Weekly band: running-best EWMA target at each week
               const band = [];
               for (let i = numWeeks - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i * 7);
                   const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
                   let target = 0;
-                  if (daysSinceFirst >= 90) {
-                      const avg90 = slidingWindowTotal(exerciseId, end, 90) / (90 / 7);
-                      if (avg90 > runningBest) runningBest = avg90;
+                  if (daysSinceFirst >= EWMA_LOOKBACK) {
+                      const val = ewmaWeeklyAt(data, end);
+                      if (val > runningBest) runningBest = val;
                       target = runningBest;
                   }
                   band.push({ date: isoDate(end), target });
