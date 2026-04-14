@@ -313,9 +313,10 @@
           if (dates.length === 0) return 0;
           const today = new Date(todayStr());
           const span = daysBetween(dates[0], todayStr());
-          if (span < BASELINE_LOOKBACK) return 0;
+          const BASELINE_MIN = 90;
+          if (span < BASELINE_MIN) return 0;
           let best = 0;
-          for (let d = 0; d <= span - BASELINE_LOOKBACK; d++) {
+          for (let d = 0; d <= span - BASELINE_MIN; d++) {
               const val = baselineAt(data, addDays(today, -d));
               if (val > best) best = val;
           }
@@ -852,7 +853,7 @@
               const windowStart = addDays(endRef, -(numDays - 1));
 
               // Pre-compute running best baseline EWMA for all days before the visible window
-              const firstEligible = addDays(firstDate, BASELINE_LOOKBACK);
+              const firstEligible = addDays(firstDate, 90);
               let runningBest = 0;
               const preDays = Math.max(0, daysBetween(isoDate(firstEligible), isoDate(windowStart)));
               for (let d = 0; d <= preDays; d++) {
@@ -875,7 +876,7 @@
                   const end = addDays(endRef, -i * 7);
                   const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
                   let target = 0;
-                  if (daysSinceFirst >= BASELINE_LOOKBACK) {
+                  if (daysSinceFirst >= 90) {
                       const val = baselineAt(data, end);
                       if (val > runningBest) runningBest = val;
                       target = runningBest;
