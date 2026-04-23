@@ -54,7 +54,7 @@ Volume must rise, but slowly; the body adapts on its own schedule. The green zon
 
 Two EWMA time scales, both normalised to weekly volume:
 
-- **Display EWMA** (21-day half-life, 84-day lookback): the blue curve on the zone chart and the "EWMA/wk" stat. Responsive to recent changes, shows current training state.
+- **Display EWMA** (14-day half-life, 56-day lookback): the blue curve on the zone chart and the "EWMA/wk" stat. Responsive to recent changes, shows current training state.
 - **Baseline EWMA** (60-day half-life, 240-day lookback): used only for green zone calculation. Sluggish by design; short bursts of intense training barely move it. Only sustained, consistent volume over months can shift the baseline upward.
 
 The baseline is `bestEwma(id)`: the highest baseline-EWMA weekly volume ever recorded for a given exercise. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. A minimum of 90 days of data is required before the baseline activates.
