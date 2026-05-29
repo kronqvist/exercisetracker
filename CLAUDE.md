@@ -57,9 +57,20 @@ Two EWMA time scales, both normalised to weekly volume:
 - **Display EWMA** (14-day half-life, 56-day lookback): the blue curve on the zone chart and the "EWMA/wk" stat. Responsive to recent changes, shows current training state.
 - **Baseline EWMA** (60-day half-life, 240-day lookback): used only for green zone calculation. Sluggish by design; short bursts of intense training barely move it. Only sustained, consistent volume over months can shift the baseline upward.
 
-The baseline is `bestEwma(id)`: the highest baseline-EWMA weekly volume ever recorded for a given exercise. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. A minimum of 90 days of data is required before the baseline activates.
+The baseline is `bestEwma(data, opts)`: the highest baseline-EWMA value ever recorded for a series. This value can only ratchet upward. The green zone spans 100 to 115% of this peak. A minimum of 90 days of data is required before the baseline activates.
 
 Home-page dots (green / yellow / red / grey) and the detail-view zone chart both derive from `bestEwma()`. The chart plots the daily display-EWMA against a green band derived from the running-best baseline-EWMA.
+
+### Two Metrics, One Engine
+
+The same machinery serves two per-day series, distinguished only by two flags passed as `opts`:
+
+- **Volume** (`VOL_OPTS`: `weekly: true`, `activeOnly: false`): the `:count` series, an accumulation summed over the week. Identical to the original behaviour. Every exercise has it.
+- **Weight** (`WT_OPTS`: `weekly: false`, `activeOnly: true`): the `:weight` series, a level averaged over the days actually trained, so rest days do not drag it toward zero. Only exercises flagged `loadable: true` in `EXERCISES` carry it.
+
+A loadable exercise gains a third stepper and a third chart view (`Daily / Volume / Weight`). Its weight green zone activates 90 days after the first logged load and serves as a recovery gauge: after a deload the baseline holds at the prior peak while the level falls, so the zone reads red and climbs back to green as load is rebuilt. Weight is intentionally never folded into volume; reps and kilograms are tracked and plotted separately.
+
+The daily-performance bars split into one stacked segment per set. The chart components for Volume and Weight are a single parameterised renderer (`drawZone(metricKey)`); they differ only in their data series and `opts`.
 
 ## Critical Rules
 
@@ -75,6 +86,6 @@ Home-page dots (green / yellow / red / grey) and the detail-view zone chart both
 ## Technical Notes
 
 - Entire app lives in `index.html` (HTML + CSS + JS, no build step)
-- Data stored in localStorage with keys: `ex:{exerciseId}:{YYYY-MM-DD}:count` and `ex:{exerciseId}:{YYYY-MM-DD}:notes`
+- Data stored in localStorage. Per day, per exercise: `:count` (canonical daily volume = sets × reps), `:sets`, `:reps`, and `:weight` (kg, loadable exercises only, written only on performed days). Old entries carry only `:count`; readers default missing `:sets` to 1, `:reps` to `count`, `:weight` to 0. The legacy `:notes` key is no longer read or written, but existing values are left untouched.
 - PWA with service worker for offline support
 - Dark theme, mobile-first design

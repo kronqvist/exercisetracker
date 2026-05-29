@@ -23,6 +23,8 @@ RUN groupadd -g ${GROUP_ID} ${USERNAME} && \
     useradd -u ${USER_ID} -g ${GROUP_ID} -m ${USERNAME} && \
     mkdir -p /app/.cache && chown -R ${USERNAME}:${USERNAME} /app
 
+RUN mkdir -p /mytest
+
 # Set the default user
 USER ${USERNAME}
 

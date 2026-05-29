@@ -51,17 +51,28 @@
       .back { display:inline-flex; align-items:center; gap:6px; margin-bottom:14px; color:var(--accent); text-decoration:none; font-size:14px; font-weight:500; }
       .row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
       .muted { color:var(--text-muted); font-size:13px; }
-      .stepper { display:flex; align-items:center; gap:14px; margin-top:12px; }
-      .btn { border:0; border-radius:14px; padding:16px 20px; background:#1c1c2e; color:var(--text); font-size:20px; font-weight:500; line-height:1;
+      .btn { border:0; border-radius:14px; padding:14px 18px; background:#1c1c2e; color:var(--text); font-size:19px; font-weight:500; line-height:1;
              cursor:pointer; transition: transform .1s ease, background .15s ease; border:1px solid var(--card-border); }
       .btn:hover { background:#24243a; }
       .btn:active { transform: scale(0.95); }
-      .count { font-variant-numeric:tabular-nums; font-size:44px; font-weight:700; min-width:4.5ch; text-align:center; letter-spacing:-.5px; }
       label { display:block; margin:20px 0 6px; font-size:13px; font-weight:500; color:var(--text-muted); }
-      input[type="text"] { width:100%; font-size:16px; padding:12px 14px; border-radius:12px; border:1px solid var(--card-border); background:var(--bg); color:var(--text); box-sizing:border-box; }
       input[type="date"] { font-size:14px; padding:10px 12px; border-radius:10px; border:1px solid var(--card-border); background:var(--bg); color:var(--text); }
       .note { color:var(--text-muted); font-size:13px; margin-top:12px; min-height:1em; transition:opacity .2s; }
+
+      /* --- Steppers (one row per field: sets, reps/unit, weight) --- */
+      .steppers { display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+      .step-row { display:flex; align-items:center; gap:12px; }
+      .step-label { width:62px; flex-shrink:0; font-size:13px; font-weight:600; color:var(--text-muted); }
+      .step-val { flex:1; font-variant-numeric:tabular-nums; font-size:30px; font-weight:700; text-align:center; letter-spacing:-.5px; }
+      .step-unit { width:30px; flex-shrink:0; text-align:left; }
+      .entry-total { margin-top:12px; font-size:13px; font-variant-numeric:tabular-nums; }
+
       .chart-wrap { margin-top:20px; background:var(--bg); border:1px solid var(--card-border); border-radius:14px; padding:14px; }
+      .chart-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 0 8px; flex-wrap:wrap; }
+      .seg { display:inline-flex; background:#1c1c2e; border:1px solid var(--card-border); border-radius:10px; overflow:hidden; }
+      .seg button { border:0; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; padding:6px 12px; cursor:pointer; transition:background .15s ease, color .15s ease; }
+      .seg button + button { border-left:1px solid var(--card-border); }
+      .seg button.active { background:#2a2a40; color:var(--text); }
       canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
 
       /* --- Toolbar --- */
@@ -135,7 +146,7 @@
 
           /* Rehab strengthening — 3x/week */
           {id:"suitcase-carry",     name:"Suitcase Carry",       unit:"sec",  dpw:3, clr:"rehab"},
-          {id:"glute-bridge",       name:"Glute Bridge",         unit:"reps", dpw:3, clr:"rehab"},
+          {id:"glute-bridge",       name:"Glute Bridge",         unit:"reps", dpw:3, clr:"rehab", loadable:true},
           {id:"clamshell",          name:"Clamshell",            unit:"reps", dpw:3, clr:"rehab"},
           {id:"draken",             name:"Draken",               unit:"reps", dpw:3, clr:"rehab"},
           {id:"rubber-band-archer", name:"Rubber Band Archer Pull", unit:"reps", dpw:3, clr:"rehab"},
@@ -163,21 +174,63 @@
       // (e.g., "do any form of cardio 2x/week" rather than "run 2x AND swim 2x AND ski 2x")
       const CAT_DPW = { cond: 2 };
 
+      // Loadable exercises gain a weight stepper and a Weight chart. WEIGHT_STEP
+      // is how much one +/- tap changes the load, in WEIGHT_UNIT. The middle
+      // stepper is labelled from the unit, so timed and counted exercises share
+      // one layout without special-casing.
+      const WEIGHT_UNIT = 'kg';
+      const WEIGHT_STEP = 0.5;
+      const UNIT_LABEL = { reps:'Reps', sec:'Seconds' };
+
       const WINDOW_DAYS = 14;
       const MS_PER_DAY = 86400000;
 
       const app = document.getElementById('app');
       const todayStr = () => new Date().toISOString().slice(0,10);
-      const esc = (s) => (s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
       const addDays = (d, n) => { const dt = new Date(d); dt.setUTCDate(dt.getUTCDate()+n); return dt; };
       const isoDate = (d) => new Date(d).toISOString().slice(0,10);
       const clamp = (v,min,max) => Math.min(max, Math.max(min, v));
 
       function keysFor(id, date) {
           return {
-              count: `ex:${id}:${date}:count`,
-              notes: `ex:${id}:${date}:notes`
+              count:  `ex:${id}:${date}:count`,
+              sets:   `ex:${id}:${date}:sets`,
+              reps:   `ex:${id}:${date}:reps`,
+              weight: `ex:${id}:${date}:weight`
           };
+      }
+
+      /* Read the structured entry for a day.
+         count is the canonical daily volume = sets × reps on new entries.
+         Old days carry only count; sets defaults to 1, reps defaults to count. */
+      function readEntry(id, date) {
+          const k = keysFor(id, date);
+          const count = parseInt(localStorage.getItem(k.count) || "0", 10) || 0;
+          const setsRaw = localStorage.getItem(k.sets);
+          const repsRaw = localStorage.getItem(k.reps);
+          const weightRaw = localStorage.getItem(k.weight);
+          const sets   = setsRaw   !== null ? (parseInt(setsRaw, 10)   || 0) : 1;
+          const reps   = repsRaw   !== null ? (parseInt(repsRaw, 10)   || 0) : count;
+          const weight = weightRaw !== null ? (parseFloat(weightRaw)   || 0) : 0;
+          return { count, sets, reps, weight };
+      }
+
+      /* Write a structured entry. count = sets × reps stays the canonical daily
+         volume, so the volume engine reads it unchanged. Weight is recorded only
+         for loadable exercises and only on performed days (count > 0), so the
+         weight series never holds a load for a day that was not trained. */
+      function writeEntry(id, date, ex, { sets, reps, weight }) {
+          const k = keysFor(id, date);
+          const s = Math.max(0, sets | 0);
+          const r = Math.max(0, reps | 0);
+          const count = s * r;
+          localStorage.setItem(k.count, String(count));
+          localStorage.setItem(k.sets,  String(s));
+          localStorage.setItem(k.reps,  String(r));
+          if (ex.loadable) {
+              const w = count > 0 ? Math.max(0, weight || 0) : 0;
+              localStorage.setItem(k.weight, String(w));
+          }
       }
       function daysBetween(a, b) {
           const A = new Date(a), B = new Date(b);
@@ -185,27 +238,38 @@
           const bb = Date.UTC(B.getUTCFullYear(), B.getUTCMonth(), B.getUTCDate());
           return Math.floor((bb - aa) / MS_PER_DAY);
       }
-      function parseDateKey(k, id) {
-          const pfx = `ex:${id}:`, sfx = `:count`;
+      function parseDateKey(k, id, field) {
+          const pfx = `ex:${id}:`, sfx = `:${field}`;
           if (!k.startsWith(pfx) || !k.endsWith(sfx)) return null;
           const ds = k.slice(pfx.length, -sfx.length);
           return /^\d{4}-\d{2}-\d{2}$/.test(ds) ? ds : null;
       }
 
-      /* ====== DATA UTILITIES (shared by analytics, export, etc.) ====== */
-      function getAllDataForExercise(id) {
+      /* ====== METRICS ======
+         A metric is a per-day numeric series read from one storage field, with
+         analytics options describing how it accumulates:
+           volume  count  weekly accumulation (summed over the week, ×7)
+           weight  kg     level averaged over the days actually trained
+         The same EWMA / baseline / green-zone machinery serves both; the two
+         flags below are the only difference between them. */
+      const VOL_OPTS = { weekly: true,  activeOnly: false };
+      const WT_OPTS  = { weekly: false, activeOnly: true  };
+
+      function seriesFor(id, field) {
           const result = {};
           for (let i = 0; i < localStorage.length; i++) {
               const k = localStorage.key(i);
               if (!k) continue;
-              const ds = parseDateKey(k, id);
+              const ds = parseDateKey(k, id, field);
               if (ds) {
-                  const v = parseInt(localStorage.getItem(k) || "0", 10);
+                  const v = parseFloat(localStorage.getItem(k) || "0");
                   if (v > 0) result[ds] = v;
               }
           }
           return result;
       }
+      const volumeSeries = (id) => seriesFor(id, 'count');
+      const weightSeries = (id) => seriesFor(id, 'weight');
 
       function getAllData() {
           const result = {};
@@ -217,8 +281,7 @@
           return result;
       }
 
-      function getStreak(id) {
-          const data = getAllDataForExercise(id);
+      function getStreak(data) {
           const today = todayStr();
           let current = 0, best = 0, run = 0;
           const todayVal = data[today] || 0;
@@ -253,9 +316,6 @@
           return total;
       }
 
-
-
-
       const EWMA_HALF_LIFE = 14;
       const EWMA_LOOKBACK = EWMA_HALF_LIFE * 4;
       const EWMA_LAMBDA = Math.LN2 / EWMA_HALF_LIFE;
@@ -264,28 +324,35 @@
       const BASELINE_LOOKBACK = BASELINE_HALF_LIFE * 4;
       const BASELINE_LAMBDA = Math.LN2 / BASELINE_HALF_LIFE;
 
-      function ewmaAt(data, endDate, lambda, lookback) {
+      const BASELINE_MIN_DAYS = 90;
+      const ZONE_TOP = 1.15;
+
+      /* Exponentially-weighted average of `data` ending at endDate.
+         weekly:     scale the daily average to a weekly total (×7), for accumulations.
+         activeOnly: count only days that hold data, giving a sustained level rather
+                     than a rate dragged toward zero by rest days. */
+      function ewmaAt(data, endDate, lambda, lookback, opts) {
           let wSum = 0, wTotal = 0;
           for (let i = 0; i < lookback; i++) {
               const ds = isoDate(addDays(endDate, -i));
-              const v = data[ds] || 0;
+              const present = data[ds] !== undefined;
+              if (opts.activeOnly && !present) continue;
+              const v = present ? data[ds] : 0;
               const w = Math.exp(-lambda * i);
               wSum += w * v;
               wTotal += w;
           }
-          return (wSum / wTotal) * 7;
+          if (wTotal === 0) return 0;
+          const avg = wSum / wTotal;
+          return opts.weekly ? avg * 7 : avg;
       }
 
-      function ewmaWeeklyAt(data, endDate) {
-          return ewmaAt(data, endDate, EWMA_LAMBDA, EWMA_LOOKBACK);
+      function ewmaWeeklyAt(data, endDate, opts) {
+          return ewmaAt(data, endDate, EWMA_LAMBDA, EWMA_LOOKBACK, opts);
       }
 
-      function baselineAt(data, endDate) {
-          return ewmaAt(data, endDate, BASELINE_LAMBDA, BASELINE_LOOKBACK);
-      }
-
-      function ewmaWeekly(id) {
-          return ewmaWeeklyAt(getAllDataForExercise(id), new Date(todayStr()));
+      function baselineAt(data, endDate, opts) {
+          return ewmaAt(data, endDate, BASELINE_LAMBDA, BASELINE_LOOKBACK, opts);
       }
 
       function linRegSlope(ys) {
@@ -300,50 +367,48 @@
           return (n * sxy - sx * sy) / denom;
       }
 
-      function volumeTrend(id, days) {
-          const data = getAllDataForExercise(id);
+      function trendPerMonth(data, days, opts) {
           const today = new Date(todayStr());
           const vals = [];
           for (let i = days - 1; i >= 0; i--) {
-              vals.push(ewmaWeeklyAt(data, addDays(today, -i)));
+              vals.push(ewmaWeeklyAt(data, addDays(today, -i), opts));
           }
-          const slopePerDay = linRegSlope(vals);
-          return slopePerDay * 30;
+          return linRegSlope(vals) * 30;
       }
 
-      function bestEwma(id) {
-          const data = getAllDataForExercise(id);
+      /* Highest baseline EWMA ever sustained; the green zone anchors here.
+         Ratchets upward only and requires BASELINE_MIN_DAYS of history first. */
+      function bestEwma(data, opts) {
           const dates = Object.keys(data).sort();
           if (dates.length === 0) return 0;
           const today = new Date(todayStr());
           const span = daysBetween(dates[0], todayStr());
-          const BASELINE_MIN = 90;
-          if (span < BASELINE_MIN) return 0;
+          if (span < BASELINE_MIN_DAYS) return 0;
           let best = 0;
-          for (let d = 0; d <= span - BASELINE_MIN; d++) {
-              const val = baselineAt(data, addDays(today, -d));
+          for (let d = 0; d <= span - BASELINE_MIN_DAYS; d++) {
+              const val = baselineAt(data, addDays(today, -d), opts);
               if (val > best) best = val;
           }
           return best;
       }
 
-      function progressZone(id) {
-          const baseline = bestEwma(id);
-          if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data' };
-          const recent = ewmaWeekly(id);
+      function zonePosition(data, opts) {
+          const baseline = bestEwma(data, opts);
+          if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data', pct: null };
+          const recent = ewmaWeeklyAt(data, new Date(todayStr()), opts);
           const ratio = recent / baseline;
           const pct = Math.round(ratio * 100);
-          if (ratio < 1.00) return { cls: 'zone-grey', label: `${pct}% of peak` };
-          if (ratio <= 1.15) return { cls: 'zone-green', label: `${pct}% of peak, green zone` };
-          if (ratio <= 1.30) return { cls: 'zone-yellow', label: `${pct}% of peak, ease off` };
-          return { cls: 'zone-red', label: `${pct}% of peak, back off` };
+          if (ratio < 1.00 - 1e-9) return { cls: 'zone-grey',   label: `${pct}% of peak`, pct };
+          if (ratio <= ZONE_TOP) return { cls: 'zone-green',  label: `${pct}% of peak, green zone`, pct };
+          if (ratio <= 1.30)     return { cls: 'zone-yellow', label: `${pct}% of peak, ease off`, pct };
+          return { cls: 'zone-red', label: `${pct}% of peak, back off`, pct };
       }
 
-      function bestWeekEver(id) {
-          const data = getAllDataForExercise(id);
+      function progressZone(id) { return zonePosition(volumeSeries(id), VOL_OPTS); }
+
+      function bestWeekEver(data) {
           const dates = Object.keys(data).sort();
           if (dates.length === 0) return 0;
-          const first = new Date(dates[0]);
           const today = new Date(todayStr());
           const span = daysBetween(dates[0], todayStr());
           let best = 0;
@@ -520,7 +585,7 @@
       }
 
       /* ---------- SWIPE STATE ---------- */
-      let detailChartMode = 'history';
+      let detailView = 'daily';   // 'daily' | 'volume' | 'weight', persisted across exercises
       let slideDirection = null;
 
       function setupSwipe(cardEl) {
@@ -559,11 +624,33 @@
           const ex = EXERCISES.find(e => e.id === id);
           if (!ex) { location.hash = ""; return; }
 
-          const date = todayStr();
-          const k = keysFor(id, date);
-          const count = parseInt(localStorage.getItem(k.count) || "0", 10);
-          const notes = localStorage.getItem(k.notes) || "";
           const accentColor = CLR_MAP[ex.clr] || 'var(--accent)';
+          const midLabel = UNIT_LABEL[ex.unit] || ex.unit;
+
+          // Chart views available for this exercise; Weight only when loadable.
+          const views = ex.loadable ? ['daily', 'volume', 'weight'] : ['daily', 'volume'];
+          let view = views.includes(detailView) ? detailView : 'daily';
+
+          // Stepper rows: sets and the unit-named middle field for every exercise;
+          // weight only for loadable ones.
+          const fields = [
+              { key: 'sets', label: 'Sets',   unit: '' },
+              { key: 'reps', label: midLabel, unit: '' }
+          ];
+          if (ex.loadable) fields.push({ key: 'weight', label: 'Weight', unit: WEIGHT_UNIT });
+
+          const stepperRows = fields.map(f => `
+        <div class="step-row">
+          <div class="step-label">${f.label}</div>
+          <button class="btn step-btn" data-field="${f.key}" data-dir="-1" aria-label="decrease ${f.label}">&ndash;</button>
+          <div class="step-val" data-field="${f.key}" style="color:${accentColor}">0</div>
+          <button class="btn step-btn" data-field="${f.key}" data-dir="1" aria-label="increase ${f.label}">+</button>
+          <div class="muted step-unit">${f.unit}</div>
+        </div>`).join('');
+
+          const segButtons = views.map(v =>
+              `<button data-view="${v}"${v === view ? ' class="active"' : ''}>${v[0].toUpperCase() + v.slice(1)}</button>`
+          ).join('');
 
           document.title = ex.name;
 
@@ -577,25 +664,18 @@
         <h1 style="margin:0;font-size:20px;color:${accentColor}">${ex.name}</h1>
         <div>
           <label for="day" style="margin:0 0 4px;font-size:11px">Date</label>
-          <input id="day" type="date" value="${date}">
+          <input id="day" type="date" value="${todayStr()}">
         </div>
       </div>
 
-      <div class="stepper">
-        <button class="btn" id="minus" aria-label="decrease">&ndash;</button>
-        <div class="count" id="count" role="status" aria-live="polite" style="color:${accentColor}">${isNaN(count)?0:count}</div>
-        <button class="btn" id="plus" aria-label="increase">+</button>
-        <div class="muted" style="margin-left:auto">${ex.unit}</div>
-      </div>
-
-      <label for="notes">Notes (optional)</label>
-      <input id="notes" type="text" placeholder="sets \u00d7 reps, comments" value="${esc(notes)}">
+      <div class="steppers" id="steppers">${stepperRows}</div>
+      <div class="entry-total muted" id="entry-total"></div>
       <div class="note" id="status">Saved</div>
 
       <div class="chart-wrap">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin:0 0 8px">
+        <div class="chart-head">
           <div class="muted" id="rangeLabel"></div>
-          <button class="toolbar-btn" id="chart-toggle" style="padding:4px 10px;font-size:11px">Zone</button>
+          <div class="seg" id="view-seg">${segButtons}</div>
         </div>
         <canvas id="chart" width="600" height="200"></canvas>
       </div>
@@ -604,185 +684,219 @@
     </div>
     </div>`;
 
-          const $count  = document.getElementById('count');
-          const $minus  = document.getElementById('minus');
-          const $plus   = document.getElementById('plus');
-          const $notes  = document.getElementById('notes');
-          const $status = document.getElementById('status');
-          const $day    = document.getElementById('day');
-          const $chart  = document.getElementById('chart');
-          const $label  = document.getElementById('rangeLabel');
-          const $toggle = document.getElementById('chart-toggle');
-          const $stats  = document.getElementById('stats');
-          let chartMode = detailChartMode;
+          const $day      = document.getElementById('day');
+          const $steppers = document.getElementById('steppers');
+          const $total    = document.getElementById('entry-total');
+          const $status   = document.getElementById('status');
+          const $chart    = document.getElementById('chart');
+          const $label    = document.getElementById('rangeLabel');
+          const $seg      = document.getElementById('view-seg');
+          const $stats    = document.getElementById('stats');
 
           const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.5';},250); };
-
+          const formatAvg = (v) => v % 1 === 0 ? String(v) : v.toFixed(1);
           function trendArrow(current, previous) {
               if (current > previous) return '<span class="stat-arrow-up">&#9650;</span>';
               if (current < previous) return '<span class="stat-arrow-down">&#9660;</span>';
               return '<span class="stat-arrow-same">&#9654;</span>';
           }
+          const statTile = (val, label) => `<div class="stat"><div class="stat-val">${val}</div><div class="stat-label">${label}</div></div>`;
 
-          function formatAvg(v) {
-              return v % 1 === 0 ? String(v) : v.toFixed(1);
+          // Most recent recorded load, used to prefill the weight stepper so a
+          // performed day defaults to last session's weight unless changed.
+          const lastWeight = (() => {
+              if (!ex.loadable) return 0;
+              const ws = weightSeries(id);
+              const ds = Object.keys(ws).sort();
+              return ds.length ? ws[ds[ds.length - 1]] : 0;
+          })();
+
+          /* ---------- entry state ---------- */
+          let entry = { sets: 1, reps: 0, weight: 0 };
+
+          function renderSteppers() {
+              for (const f of fields) {
+                  const el = $steppers.querySelector(`.step-val[data-field="${f.key}"]`);
+                  if (el) el.textContent = f.key === 'weight' ? formatAvg(entry.weight) : String(entry[f.key]);
+              }
+              const count = entry.sets * entry.reps;
+              const load = ex.loadable && entry.weight > 0 ? ` @ ${formatAvg(entry.weight)} ${WEIGHT_UNIT}` : '';
+              $total.textContent = count > 0 ? `${entry.sets} × ${entry.reps}${load} = ${count} ${ex.unit}` : 'Not logged this day';
           }
 
-          function updateStats() {
-              const allData = getAllDataForExercise(id);
-              const sortedDates = Object.keys(allData).sort();
-              const daysRecorded = sortedDates.length;
-              const total = Object.values(allData).reduce((s, v) => s + v, 0);
+          function loadEntry(dateStr) {
+              const e = readEntry(id, dateStr);
+              if (ex.loadable && e.weight === 0) e.weight = lastWeight;
+              entry = { sets: e.sets, reps: e.reps, weight: e.weight };
+              renderSteppers();
+          }
+
+          function persist(dateStr) {
+              writeEntry(id, dateStr, ex, entry);
+              renderSteppers();
+              showSaved();
+              redrawAll();
+          }
+
+          $steppers.addEventListener('click', (e) => {
+              const btn = e.target.closest('.step-btn');
+              if (!btn) return;
+              const key = btn.dataset.field;
+              const dir = parseInt(btn.dataset.dir, 10);
+              if (key === 'weight') {
+                  entry.weight = Math.max(0, Math.round((entry.weight + dir * WEIGHT_STEP) * 100) / 100);
+              } else {
+                  entry[key] = Math.max(0, (entry[key] | 0) + dir);
+              }
+              persist($day.value);
+          }, {passive:true});
+
+          $day.addEventListener('change', () => { loadEntry($day.value); redrawAll(); });
+
+          /* ---------- stats ---------- */
+          function volumeStats() {
+              const data = volumeSeries(id);
+              const sortedDates = Object.keys(data).sort();
+              const total = Object.values(data).reduce((s, v) => s + v, 0);
               const startDate = sortedDates.length > 0 ? sortedDates[0] : null;
 
-              // Current performance
               const thisWeek = getWeekTotal(id, 0);
               const lastWeek = getWeekTotal(id, 1);
               const arrow = trendArrow(thisWeek, lastWeek);
               const pooledDpw = CAT_DPW[ex.clr];
               let weekDays, targetDpw, freqLabel;
               if (pooledDpw !== undefined) {
-                  weekDays = getCategoryWeekProgress(ex.clr);
-                  targetDpw = pooledDpw;
-                  freqLabel = `${pooledDpw}x/wk shared`;
+                  weekDays = getCategoryWeekProgress(ex.clr); targetDpw = pooledDpw; freqLabel = `${pooledDpw}x/wk shared`;
               } else {
-                  weekDays = getCurrentWeekProgress(id);
-                  targetDpw = ex.dpw;
-                  freqLabel = `${ex.dpw}x/wk`;
+                  weekDays = getCurrentWeekProgress(id); targetDpw = ex.dpw; freqLabel = `${ex.dpw}x/wk`;
               }
 
-              // Trends
-              const ewma = ewmaWeeklyAt(allData, new Date(todayStr()));
-              const zoneBase = bestEwma(id);
+              const ewma = ewmaWeeklyAt(data, new Date(todayStr()), VOL_OPTS);
+              const zoneBase = bestEwma(data, VOL_OPTS);
               const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
               const zoneLow = Math.floor(zoneBase);
-              const zoneHigh = Math.ceil(zoneBase * 1.15);
-              const trend90 = volumeTrend(id, 90);
-              const trendSign = trend90 > 0.5 ? '+' : trend90 < -0.5 ? '' : '\u00b1';
+              const zoneHigh = Math.ceil(zoneBase * ZONE_TOP);
+              const trend90 = trendPerMonth(data, 90, VOL_OPTS);
+              const trendSign = trend90 > 0.5 ? '+' : trend90 < -0.5 ? '' : '±';
               const trendVal = Math.abs(trend90) < 0.5 ? '0' : formatAvg(trend90);
+              const streak = getStreak(data);
+              const bestWk = bestWeekEver(data);
 
-              // History
-              const streak = getStreak(id);
-              const bestWk = bestWeekEver(id);
-
-              $stats.innerHTML = `
-                <div class="stat"><div class="stat-val">${zonePct !== null ? zonePct + '%' : '\u2014'}</div><div class="stat-label">Zone position</div></div>
-                <div class="stat"><div class="stat-val">${weekDays}/${targetDpw}</div><div class="stat-label">This wk (${freqLabel})</div></div>
-                <div class="stat"><div class="stat-val">${arrow} ${thisWeek}</div><div class="stat-label">Wk vol (prev ${lastWeek})</div></div>
-                <div class="stat"><div class="stat-val">${formatAvg(ewma)}</div><div class="stat-label">EWMA/wk</div></div>
-                <div class="stat"><div class="stat-val">${trendSign}${trendVal}</div><div class="stat-label">Trend/mo</div></div>
-                <div class="stat"><div class="stat-val">${zoneBase > 0 ? zoneLow + '\u2013' + zoneHigh : '\u2014'}</div><div class="stat-label">Green zone/wk</div></div>
-                <div class="stat"><div class="stat-val">${streak.current}</div><div class="stat-label">Streak</div></div>
-                <div class="stat"><div class="stat-val">${streak.best}</div><div class="stat-label">Best streak</div></div>
-                <div class="stat"><div class="stat-val">${bestWk}</div><div class="stat-label">Best wk</div></div>
-                <div class="stat"><div class="stat-val">${total}</div><div class="stat-label">All-time ${ex.unit}</div></div>
-                <div class="stat"><div class="stat-val">${daysRecorded}</div><div class="stat-label">Days recorded</div></div>
-                <div class="stat"><div class="stat-val">${startDate || '\u2014'}</div><div class="stat-label">Since</div></div>
-              `;
+              return [
+                  statTile(zonePct !== null ? zonePct + '%' : '—', 'Zone position'),
+                  statTile(`${weekDays}/${targetDpw}`, `This wk (${freqLabel})`),
+                  statTile(`${arrow} ${thisWeek}`, `Wk vol (prev ${lastWeek})`),
+                  statTile(formatAvg(ewma), 'EWMA/wk'),
+                  statTile(`${trendSign}${trendVal}`, 'Trend/mo'),
+                  statTile(zoneBase > 0 ? zoneLow + '–' + zoneHigh : '—', 'Green zone/wk'),
+                  statTile(streak.current, 'Streak'),
+                  statTile(streak.best, 'Best streak'),
+                  statTile(bestWk, 'Best wk'),
+                  statTile(total, `All-time ${ex.unit}`),
+                  statTile(sortedDates.length, 'Days recorded'),
+                  statTile(startDate || '—', 'Since')
+              ].join('');
           }
 
-          function storage(dateStr) { return keysFor(id, dateStr); }
-          function loadFor(dateStr) {
-              const kk = storage(dateStr);
-              const c = parseInt(localStorage.getItem(kk.count) || "0", 10);
-              const n = localStorage.getItem(kk.notes) || "";
-              $count.textContent = isNaN(c) ? 0 : c;
-              $notes.value = n;
-              showSaved();
-              computeBounds();
-              drawActiveChart();
-              updateStats();
+          function weightStats() {
+              const data = weightSeries(id);
+              const dates = Object.keys(data).sort();
+              const u = WEIGHT_UNIT;
+              if (dates.length === 0) {
+                  return statTile('—', 'Zone position') + statTile('—', `Level ${u}`) +
+                      `<div class="stat" style="grid-column:1/-1"><div class="stat-label">No weight logged yet. Add a load above to start the weight chart.</div></div>`;
+              }
+              const ewma = ewmaWeeklyAt(data, new Date(todayStr()), WT_OPTS);
+              const base = bestEwma(data, WT_OPTS);
+              const pct = base > 0 ? Math.round((ewma / base) * 100) : null;
+              const trend90 = trendPerMonth(data, 90, WT_OPTS);
+              const trendSign = trend90 > 0.05 ? '+' : trend90 < -0.05 ? '' : '±';
+              const trendVal = Math.abs(trend90) < 0.05 ? '0' : formatAvg(trend90);
+              const heaviest = Math.max(...Object.values(data));
+              const latest = data[dates[dates.length - 1]];
+
+              return [
+                  statTile(pct !== null ? pct + '%' : '—', 'Zone position'),
+                  statTile(formatAvg(ewma), `Level ${u}`),
+                  statTile(base > 0 ? formatAvg(base) + '–' + formatAvg(base * ZONE_TOP) : '—', `Green zone ${u}`),
+                  statTile(`${trendSign}${trendVal}`, `Trend/mo ${u}`),
+                  statTile(formatAvg(heaviest), `Heaviest ${u}`),
+                  statTile(formatAvg(latest), `Latest ${u}`),
+                  statTile(dates.length, 'Days weighted'),
+                  statTile(dates[0], 'Since')
+              ].join('');
           }
-          function saveCount(dateStr, n) {
-              localStorage.setItem(storage(dateStr).count, String(n));
-              showSaved();
-              computeBounds();
-              drawActiveChart();
-              updateStats();
-          }
-          function saveNotes(dateStr, v) {
-              localStorage.setItem(storage(dateStr).notes, v);
-              showSaved();
+
+          function updateStats() {
+              $stats.innerHTML = view === 'weight' ? weightStats() : volumeStats();
           }
 
-          $plus.addEventListener('click', () => {
-              const n = parseInt($count.textContent,10) + 1;
-              $count.textContent = n; saveCount($day.value, n);
-          }, {passive:true});
+          /* ---------- charts ---------- */
+          const barColor = getComputedStyle(document.documentElement).getPropertyValue(`--clr-${ex.clr}`).trim() || '#6ea8fe';
+          const chartBg  = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0c0c14';
 
-          $minus.addEventListener('click', () => {
-              const n = Math.max(0, parseInt($count.textContent,10) - 1);
-              $count.textContent = n; saveCount($day.value, n);
-          }, {passive:true});
+          // Metric descriptors for the generic zone chart.
+          const METRICS = {
+              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk' },
+              weight: { series: () => weightSeries(id), opts: WT_OPTS, label: `Weight (${WEIGHT_UNIT})` }
+          };
 
-          let t; $notes.addEventListener('input', (e) => {
-              clearTimeout(t); t = setTimeout(()=>saveNotes($day.value, e.target.value), 120);
-          });
+          function prepCanvas() {
+              const dpr = window.devicePixelRatio || 1;
+              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
+              $chart.width = Math.round(cssW * dpr);
+              $chart.height = Math.round(cssH * dpr);
+              const ctx = $chart.getContext('2d');
+              ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+              ctx.clearRect(0, 0, cssW, cssH);
+              return { ctx, cssW, cssH };
+          }
 
-          $day.addEventListener('change', () => loadFor($day.value));
-
-          // --- history window + panning state ---
-          let earliest = todayStr();
-          let latest = todayStr();
+          // --- daily bars (volume), split into one segment per set ---
           let maxOffsetDays = 0;
           let offsetDays = 0;
           let pxPerDay = 8;
 
           function computeBounds() {
               let minDS = todayStr(), hasAny = false;
-              for (let i=0;i<localStorage.length;i++) {
+              for (let i = 0; i < localStorage.length; i++) {
                   const k = localStorage.key(i);
                   if (!k) continue;
-                  const ds = parseDateKey(k, id);
+                  const ds = parseDateKey(k, id, 'count');
                   if (ds) { hasAny = true; if (ds < minDS) minDS = ds; }
               }
               const today = todayStr();
-              earliest = hasAny ? minDS : today;
-              latest = today;
-              maxOffsetDays = Math.max(0, daysBetween(earliest, latest) - (WINDOW_DAYS - 1));
+              maxOffsetDays = Math.max(0, daysBetween(hasAny ? minDS : today, today) - (WINDOW_DAYS - 1));
               offsetDays = clamp(offsetDays, 0, maxOffsetDays);
           }
 
           function getHistoryWindow(endISO, days) {
               const end = new Date(endISO);
-              const start = addDays(end, -(days-1));
-              const labels = [];
-              const values = [];
-              for (let i=0;i<days;i++) {
-                  const d = addDays(start, i);
-                  const ds = isoDate(d);
-                  const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
+              const start = addDays(end, -(days - 1));
+              const labels = [], counts = [], setsArr = [];
+              for (let i = 0; i < days; i++) {
+                  const ds = isoDate(addDays(start, i));
+                  const e = readEntry(id, ds);
                   labels.push(ds.slice(5));
-                  values.push(isNaN(v)?0:v);
+                  counts.push(e.count);
+                  setsArr.push(e.count > 0 ? Math.max(1, e.sets) : 0);
               }
-              return { labels, values, startISO: isoDate(start), endISO: isoDate(end) };
+              return { labels, counts, setsArr, startISO: isoDate(start), endISO: isoDate(end) };
           }
 
-          // --- drawing ---
-          const barColor = getComputedStyle(document.documentElement).getPropertyValue(`--clr-${ex.clr}`).trim() || '#6ea8fe';
-
-          function drawHistory() {
+          function drawDaily() {
               const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
-              const { labels, values, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
-
-              const dpr = window.devicePixelRatio || 1;
-              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
-              $chart.width = Math.round(cssW * dpr);
-              $chart.height = Math.round(cssH * dpr);
-
-              const ctx = $chart.getContext('2d');
-              ctx.setTransform(dpr,0,0,dpr,0,0);
-              ctx.clearRect(0,0,cssW,cssH);
+              const { labels, counts, setsArr, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
+              const { ctx, cssW, cssH } = prepCanvas();
 
               const pad = { l: 32, r: 8, t: 8, b: 24 };
               const w = cssW - pad.l - pad.r;
               const h = cssH - pad.t - pad.b;
-              const maxV = Math.max(5, ...values);
+              const maxV = Math.max(5, ...counts);
               const barGap = 6;
-              const barW = Math.max(4, (w - barGap*(values.length-1)) / values.length);
+              const barW = Math.max(4, (w - barGap * (counts.length - 1)) / counts.length);
               pxPerDay = w / WINDOW_DAYS;
 
-              // axes
               ctx.strokeStyle = 'rgba(255,255,255,0.1)';
               ctx.lineWidth = 1;
               ctx.beginPath();
@@ -791,7 +905,6 @@
               ctx.lineTo(pad.l + w, pad.t + h);
               ctx.stroke();
 
-              // y ticks
               ctx.fillStyle = 'rgba(255,255,255,0.45)';
               ctx.font = '11px -apple-system, system-ui, Arial';
               ctx.textAlign = 'right';
@@ -799,17 +912,18 @@
               ctx.fillText('0', pad.l - 6, pad.t + h);
               ctx.fillText(String(maxV), pad.l - 6, pad.t);
 
-              // bars
               const startX = pad.l;
-              ctx.fillStyle = barColor;
-              ctx.globalAlpha = 0.7;
-              for (let i = 0; i < values.length; i++) {
-                  const v = values[i];
+              for (let i = 0; i < counts.length; i++) {
+                  const v = counts[i];
+                  if (v <= 0) continue;
                   const x = startX + i * (barW + barGap);
                   const bh = (v / maxV) * h;
                   const y = pad.t + h - bh;
+                  const r = Math.min(3, barW / 2);
+
+                  ctx.fillStyle = barColor;
+                  ctx.globalAlpha = 0.7;
                   ctx.beginPath();
-                  const r = Math.min(3, barW/2);
                   if (bh > r) {
                       ctx.moveTo(Math.round(x), Math.round(y + bh));
                       ctx.lineTo(Math.round(x), Math.round(y + r));
@@ -817,15 +931,28 @@
                       ctx.lineTo(Math.round(x + barW - r), Math.round(y));
                       ctx.quadraticCurveTo(Math.round(x + barW), Math.round(y), Math.round(x + barW), Math.round(y + r));
                       ctx.lineTo(Math.round(x + barW), Math.round(y + bh));
-                  } else if (bh > 0) {
+                  } else {
                       ctx.rect(Math.round(x), Math.round(y), Math.round(barW), Math.round(bh));
                   }
                   ctx.fill();
+
+                  // divider lines between sets, drawn in the background colour
+                  const sets = setsArr[i];
+                  if (sets > 1 && bh > 4) {
+                      ctx.globalAlpha = 1;
+                      ctx.strokeStyle = chartBg;
+                      ctx.lineWidth = 1.5;
+                      for (let s = 1; s < sets; s++) {
+                          const dy = Math.round(pad.t + h - (s / sets) * bh);
+                          ctx.beginPath();
+                          ctx.moveTo(Math.round(x), dy);
+                          ctx.lineTo(Math.round(x + barW), dy);
+                          ctx.stroke();
+                      }
+                  }
               }
               ctx.globalAlpha = 1;
 
-
-              // x labels
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
               ctx.font = '10px -apple-system, system-ui, Arial';
               ctx.textAlign = 'center';
@@ -836,17 +963,16 @@
                   ctx.fillText(labels[i], Math.round(x), pad.t + h + 5);
               }
 
-              $label.textContent = `${startISO}  \u2192  ${eISO}`;
+              $label.textContent = `${startISO}  →  ${eISO}`;
           }
 
-          /* --- zone chart: EWMA weekly volume with green zone band --- */
+          // --- generic zone chart: EWMA with running-best green band ---
           const ZONE_WEEKS = 26;
           let zoneOffsetWeeks = 0;
           let maxZoneOffset = 0;
           let pxPerWeek = 8;
 
-          function zoneData(exerciseId, numWeeks, offsetWeeks) {
-              const data = getAllDataForExercise(exerciseId);
+          function zoneData(data, opts, numWeeks, offsetWeeks) {
               const dates = Object.keys(data).sort();
               if (dates.length === 0) return { curve: [], band: [] };
 
@@ -856,32 +982,30 @@
               const numDays = numWeeks * 7;
               const windowStart = addDays(endRef, -(numDays - 1));
 
-              // Pre-compute running best baseline EWMA for all days before the visible window
-              const firstEligible = addDays(firstDate, 90);
+              // Running best baseline EWMA accumulated up to the visible window.
+              const firstEligible = addDays(firstDate, BASELINE_MIN_DAYS);
               let runningBest = 0;
               const preDays = Math.max(0, daysBetween(isoDate(firstEligible), isoDate(windowStart)));
               for (let d = 0; d <= preDays; d++) {
                   const end = addDays(firstEligible, d);
                   if (end > windowStart) break;
-                  const val = baselineAt(data, end);
+                  const val = baselineAt(data, end, opts);
                   if (val > runningBest) runningBest = val;
               }
 
-              // Daily curve: EWMA weekly volume at each day
               const curve = [];
               for (let i = numDays - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i);
-                  curve.push({ date: isoDate(end), value: ewmaWeeklyAt(data, end) });
+                  curve.push({ date: isoDate(end), value: ewmaWeeklyAt(data, end, opts) });
               }
 
-              // Weekly band: running-best EWMA target at each week
               const band = [];
               for (let i = numWeeks - 1; i >= 0; i--) {
                   const end = addDays(endRef, -i * 7);
                   const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
                   let target = 0;
-                  if (daysSinceFirst >= 90) {
-                      const val = baselineAt(data, end);
+                  if (daysSinceFirst >= BASELINE_MIN_DAYS) {
+                      const val = baselineAt(data, end, opts);
                       if (val > runningBest) runningBest = val;
                       target = runningBest;
                   }
@@ -890,8 +1014,7 @@
               return { curve, band };
           }
 
-          function computeZoneBounds() {
-              const data = getAllDataForExercise(id);
+          function computeZoneBounds(data) {
               const dates = Object.keys(data).sort();
               if (dates.length === 0) { maxZoneOffset = 0; return; }
               const firstDate = new Date(dates[0]);
@@ -901,19 +1024,17 @@
               zoneOffsetWeeks = clamp(zoneOffsetWeeks, 0, maxZoneOffset);
           }
 
-          function drawZoneChart() {
-              computeZoneBounds();
-              const { curve, band } = zoneData(id, ZONE_WEEKS, zoneOffsetWeeks);
-              if (curve.length === 0) return;
+          function drawZone(metricKey) {
+              const m = METRICS[metricKey];
+              const data = m.series();
+              computeZoneBounds(data);
+              const { curve, band } = zoneData(data, m.opts, ZONE_WEEKS, zoneOffsetWeeks);
+              const { ctx, cssW, cssH } = prepCanvas();
 
-              const dpr = window.devicePixelRatio || 1;
-              const cssW = $chart.clientWidth, cssH = $chart.clientHeight;
-              $chart.width = Math.round(cssW * dpr);
-              $chart.height = Math.round(cssH * dpr);
-
-              const ctx = $chart.getContext('2d');
-              ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-              ctx.clearRect(0, 0, cssW, cssH);
+              if (curve.length === 0) {
+                  $label.textContent = `${m.label}  —  no data yet`;
+                  return;
+              }
 
               const pad = { l: 40, r: 8, t: 8, b: 24 };
               const w = cssW - pad.l - pad.r;
@@ -922,7 +1043,7 @@
               const nb = band.length;
 
               const allVals = curve.map(p => p.value)
-                  .concat(band.flatMap(p => [p.target * 1.15, p.target]));
+                  .concat(band.flatMap(p => [p.target * ZONE_TOP, p.target]));
               const maxV = Math.max(5, ...allVals) * 1.1;
 
               const toY = v => pad.t + h - (v / maxV) * h;
@@ -930,12 +1051,11 @@
               const bandX = i => pad.l + (i / (nb - 1)) * w;
               pxPerWeek = w / (nb - 1);
 
-              // green zone polygon (weekly band, 100%–115% of running-best)
               const first = band.findIndex(p => p.target > 0);
               if (first >= 0) {
                   ctx.fillStyle = 'rgba(74,222,128,0.12)';
                   ctx.beginPath();
-                  for (let i = first; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * 1.15));
+                  for (let i = first; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * ZONE_TOP));
                   for (let i = nb - 1; i >= first; i--) ctx.lineTo(bandX(i), toY(band[i].target));
                   ctx.closePath();
                   ctx.fill();
@@ -948,13 +1068,12 @@
                   for (let i = first + 1; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target));
                   ctx.stroke();
                   ctx.beginPath();
-                  ctx.moveTo(bandX(first), toY(band[first].target * 1.15));
-                  for (let i = first + 1; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * 1.15));
+                  ctx.moveTo(bandX(first), toY(band[first].target * ZONE_TOP));
+                  for (let i = first + 1; i < nb; i++) ctx.lineTo(bandX(i), toY(band[i].target * ZONE_TOP));
                   ctx.stroke();
                   ctx.setLineDash([]);
               }
 
-              // axes
               ctx.strokeStyle = 'rgba(255,255,255,0.1)';
               ctx.lineWidth = 1;
               ctx.beginPath();
@@ -963,7 +1082,6 @@
               ctx.lineTo(pad.l + w, pad.t + h);
               ctx.stroke();
 
-              // y ticks
               ctx.fillStyle = 'rgba(255,255,255,0.45)';
               ctx.font = '11px -apple-system, system-ui, Arial';
               ctx.textAlign = 'right';
@@ -971,7 +1089,6 @@
               ctx.fillText('0', pad.l - 6, pad.t + h);
               ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
 
-              // EWMA line (daily resolution)
               ctx.strokeStyle = barColor;
               ctx.lineWidth = 2;
               ctx.beginPath();
@@ -982,7 +1099,6 @@
               }
               ctx.stroke();
 
-              // trend line (linear regression over visible curve)
               if (nd >= 14) {
                   const vals = curve.map(p => p.value);
                   const slope = linRegSlope(vals);
@@ -1000,7 +1116,6 @@
                   ctx.setLineDash([]);
               }
 
-              // x labels
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
               ctx.font = '10px -apple-system, system-ui, Arial';
               ctx.textAlign = 'center';
@@ -1010,23 +1125,31 @@
                   ctx.fillText(curve[i].date.slice(5), curveX(i), pad.t + h + 5);
               }
 
-              $label.textContent = `EWMA/wk  \u2014  ${curve[0].date} \u2192 ${curve[nd - 1].date}`;
+              $label.textContent = `${m.label}  —  ${curve[0].date} → ${curve[nd - 1].date}`;
           }
 
           function drawActiveChart() {
-              if (chartMode === 'zone') drawZoneChart();
-              else drawHistory();
+              if (view === 'daily') drawDaily();
+              else drawZone(view);
           }
 
-          $toggle.textContent = chartMode === 'history' ? 'Zone' : 'Daily';
-          $toggle.addEventListener('click', () => {
-              chartMode = chartMode === 'history' ? 'zone' : 'history';
-              detailChartMode = chartMode;
-              $toggle.textContent = chartMode === 'history' ? 'Zone' : 'Daily';
+          function redrawAll() {
+              computeBounds();
               drawActiveChart();
+              updateStats();
+          }
+
+          $seg.addEventListener('click', (e) => {
+              const btn = e.target.closest('button[data-view]');
+              if (!btn) return;
+              view = btn.dataset.view;
+              detailView = view;
+              for (const b of $seg.querySelectorAll('button')) b.classList.toggle('active', b.dataset.view === view);
+              drawActiveChart();
+              updateStats();
           });
 
-          // --- interactions ---
+          /* ---------- chart pan / zoom ---------- */
           let dragging = false;
           let startX = 0;
 
@@ -1039,23 +1162,15 @@
           $chart.addEventListener('pointermove', (e) => {
               if (!dragging) return;
               const dx = e.clientX - startX;
-              if (chartMode === 'zone') {
-                  const deltaWeeks = Math.round(dx / pxPerWeek);
-                  if (deltaWeeks !== 0) {
-                      zoneOffsetWeeks = clamp(zoneOffsetWeeks + deltaWeeks, 0, maxZoneOffset);
-                      startX += deltaWeeks * pxPerWeek;
-                      drawZoneChart();
-                  }
-              } else {
+              if (view === 'daily') {
                   const deltaDays = Math.round(dx / pxPerDay);
-                  if (deltaDays !== 0) {
-                      offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays);
-                      startX += deltaDays * pxPerDay;
-                      drawHistory();
-                  }
+                  if (deltaDays !== 0) { offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays); startX += deltaDays * pxPerDay; drawActiveChart(); }
+              } else {
+                  const deltaWeeks = Math.round(dx / pxPerWeek);
+                  if (deltaWeeks !== 0) { zoneOffsetWeeks = clamp(zoneOffsetWeeks + deltaWeeks, 0, maxZoneOffset); startX += deltaWeeks * pxPerWeek; drawActiveChart(); }
               }
           });
-          function endDrag(e){
+          function endDrag(e) {
               if (!dragging) return;
               dragging = false;
               $chart.style.cursor = 'grab';
@@ -1068,27 +1183,27 @@
           $chart.addEventListener('wheel', (e) => {
               e.preventDefault();
               const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-              if (chartMode === 'zone') {
-                  zoneOffsetWeeks = clamp(zoneOffsetWeeks + (delta > 0 ? -2 : 2), 0, maxZoneOffset);
-                  drawZoneChart();
-              } else {
+              if (view === 'daily') {
                   offsetDays = clamp(offsetDays + (delta > 0 ? -3 : 3), 0, maxOffsetDays);
-                  drawHistory();
+              } else {
+                  zoneOffsetWeeks = clamp(zoneOffsetWeeks + (delta > 0 ? -2 : 2), 0, maxZoneOffset);
               }
+              drawActiveChart();
           }, {passive:false});
 
           const onKey = (e) => {
-              if (chartMode === 'zone') {
-                  if (e.key === 'ArrowLeft')  { zoneOffsetWeeks = clamp(zoneOffsetWeeks + 1, 0, maxZoneOffset); drawZoneChart(); }
-                  if (e.key === 'ArrowRight') { zoneOffsetWeeks = clamp(zoneOffsetWeeks - 1, 0, maxZoneOffset); drawZoneChart(); }
+              if (view === 'daily') {
+                  if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawActiveChart(); }
+                  if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawActiveChart(); }
               } else {
-                  if (e.key === 'ArrowLeft')  { offsetDays = clamp(offsetDays + 1, 0, maxOffsetDays); drawHistory(); }
-                  if (e.key === 'ArrowRight') { offsetDays = clamp(offsetDays - 1, 0, maxOffsetDays); drawHistory(); }
+                  if (e.key === 'ArrowLeft')  { zoneOffsetWeeks = clamp(zoneOffsetWeeks + 1, 0, maxZoneOffset); drawActiveChart(); }
+                  if (e.key === 'ArrowRight') { zoneOffsetWeeks = clamp(zoneOffsetWeeks - 1, 0, maxZoneOffset); drawActiveChart(); }
               }
           };
           document.addEventListener('keydown', onKey);
 
           // init
+          loadEntry($day.value);
           computeBounds();
           drawActiveChart();
           updateStats();
