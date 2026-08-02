@@ -86,7 +86,6 @@
       .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(100px,1fr)); gap:8px; margin-top:16px; }
       .stat { background:var(--bg); border:1px solid var(--card-border); border-radius:12px; padding:12px 8px; text-align:center; }
       .stat-info-trigger { width:100%; color:inherit; font:inherit; cursor:pointer; position:relative; appearance:none; }
-      .stat-info-trigger::after { content:'ⓘ'; position:absolute; top:6px; right:7px; color:var(--text-muted); font-size:10px; font-weight:400; opacity:.65; }
       .stat-info-trigger:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
       .stat-val { font-size:20px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.3px; }
       .stat-label { font-size:10px; font-weight:500; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:.5px; }
@@ -233,9 +232,9 @@
           },
           'trend-volume': {
               title: '90-day trend per month',
-              body: `<p>The general direction of your volume EWMA over the most recent 90 calendar days, expressed as the expected change over 30 days.</p>
-                     <code>b = Σ((day − mean day) × (EWMA − mean EWMA)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b</code>
-                     <p>A value of +12 means the fitted trend rose by about 12 volume units per 30 days. It uses a best-fit line rather than only comparing two endpoints, and does not change when the chart is panned.</p>`
+              body: `<p>The general direction of your volume EWMA over the most recent 90 calendar days, expressed as a percentage per 30 days.</p>
+                     <code>b = Σ((day − mean day) × (EWMA − mean EWMA)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean EWMA × 100%</code>
+                     <p>A value of +12% means the fitted monthly change equals about 12% of the average EWMA during those 90 days. It uses a best-fit line rather than only comparing two endpoints, is not a compounded growth rate, and does not change when the chart is panned.</p>`
           },
           'green-volume': {
               title: 'Green zone per week',
@@ -285,9 +284,9 @@
           },
           'trend-weight': {
               title: '90-day weight trend per month',
-              body: `<p>The general direction of your smoothed weight level over the most recent 90 calendar days, expressed as kilograms per 30 days.</p>
-                     <code>b = Σ((day − mean day) × (level − mean level)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b</code>
-                     <p>It uses a best-fit line through all 90 daily levels and is independent of the visible chart range.</p>`
+              body: `<p>The general direction of your smoothed weight level over the most recent 90 calendar days, expressed as a percentage per 30 days.</p>
+                     <code>b = Σ((day − mean day) × (level − mean level)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean level × 100%</code>
+                     <p>It uses a best-fit line through all 90 daily levels. The percentage is relative to their 90-day average, is not compounded, and is independent of the visible chart range.</p>`
           },
           'ewma-best-weight': {
               title: 'Best weight EWMA',
@@ -536,13 +535,16 @@
           return (n * sxy - sx * sy) / denom;
       }
 
-      function trendPerMonth(data, days, opts) {
+      function trendPercentPerMonth(data, days, opts) {
           const today = new Date(todayStr());
           const vals = [];
           for (let i = days - 1; i >= 0; i--) {
               vals.push(ewmaWeeklyAt(data, addDays(today, -i), opts));
           }
-          return linRegSlope(vals) * 30;
+          const mean = vals.reduce((sum, value) => sum + value, 0) / vals.length;
+          if (mean === 0) return 0;
+          const monthlyChange = linRegSlope(vals) * 30;
+          return (monthlyChange / mean) * 100;
       }
 
       /* Highest baseline EWMA ever sustained; the green zone anchors here.
@@ -946,16 +948,16 @@
               const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
               const zoneLow = Math.floor(zoneBase);
               const zoneHigh = Math.ceil(zoneBase * ZONE_TOP);
-              const trend90 = trendPerMonth(data, 90, VOL_OPTS);
-              const trendSign = trend90 > 0.5 ? '+' : trend90 < -0.5 ? '' : '±';
-              const trendVal = Math.abs(trend90) < 0.5 ? '0' : formatAvg(trend90);
+              const trend90 = trendPercentPerMonth(data, 90, VOL_OPTS);
+              const trendSign = trend90 > 0.05 ? '+' : trend90 < -0.05 ? '' : '±';
+              const trendVal = Math.abs(trend90) < 0.05 ? '0' : formatAvg(trend90);
 
               return [
                   statTile(zonePct !== null ? zonePct + '%' : '—', 'Zone position', 'zone-volume'),
                   statTile(`${weekDays}/${targetDpw}`, `This wk (${freqLabel})`, 'week-frequency'),
                   statTile(`${arrow} ${thisWeek}`, `Wk vol (prev ${lastWeek})`, 'week-volume'),
                   statTile(formatAvg(ewma), 'EWMA/wk', 'ewma-volume'),
-                  statTile(`${trendSign}${trendVal}`, '90-day trend/mo', 'trend-volume'),
+                  statTile(`${trendSign}${trendVal}%`, '90-day trend/mo', 'trend-volume'),
                   statTile(zoneBase > 0 ? zoneLow + '–' + zoneHigh : '—', 'Green zone/wk', 'green-volume'),
                   statTile(formatAvg(ewmaBest), 'EWMA/wk best', 'ewma-best-volume'),
                   statTile(bestWk, 'Best wk', 'best-week'),
@@ -977,7 +979,7 @@
               const ewmaBest = bestDisplayEwma(data, WT_OPTS);
               const base = bestEwma(data, WT_OPTS);
               const pct = base > 0 ? Math.round((ewma / base) * 100) : null;
-              const trend90 = trendPerMonth(data, 90, WT_OPTS);
+              const trend90 = trendPercentPerMonth(data, 90, WT_OPTS);
               const trendSign = trend90 > 0.05 ? '+' : trend90 < -0.05 ? '' : '±';
               const trendVal = Math.abs(trend90) < 0.05 ? '0' : formatAvg(trend90);
               const heaviest = Math.max(...Object.values(data));
@@ -987,7 +989,7 @@
                   statTile(pct !== null ? pct + '%' : '—', 'Zone position', 'zone-weight'),
                   statTile(formatAvg(ewma), `Level ${u}`, 'weight-level'),
                   statTile(base > 0 ? formatAvg(base) + '–' + formatAvg(base * ZONE_TOP) : '—', `Green zone ${u}`, 'green-weight'),
-                  statTile(`${trendSign}${trendVal}`, `90-day trend/mo ${u}`, 'trend-weight'),
+                  statTile(`${trendSign}${trendVal}%`, '90-day trend/mo', 'trend-weight'),
                   statTile(formatAvg(ewmaBest), `EWMA best ${u}`, 'ewma-best-weight'),
                   statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
                   statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
