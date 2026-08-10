@@ -37,9 +37,8 @@
                    -webkit-user-select:none; user-select:none; }
       .list-item:active { transform:scale(.98); }
       .list-item.done { border-left-color:#4ade80; box-shadow:0 0 16px var(--done-glow), 0 2px 8px rgba(0,0,0,.2); }
-      .list-item-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+      .list-item-text { flex:1; min-width:0; }
       .list-item-name { font-size:14px; font-weight:600; line-height:1.2; }
-      .list-item-meta { font-size:12px; color:var(--text-muted); }
       .list-item-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
       .list-item-count { text-align:right; font-variant-numeric:tabular-nums; min-width:3ch; }
       .list-item-count-val { display:block; font-size:14px; font-weight:700; }
@@ -114,16 +113,11 @@
       .dash-cat { background:var(--card); border:1px solid var(--card-border); border-radius:var(--r); padding:18px; margin-bottom:14px; }
       .dash-cat-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
       .dash-cat-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; }
-      .dash-cat-pct { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
-      .dash-bar-track { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; margin-bottom:14px; }
-      .dash-bar-fill { height:100%; border-radius:3px; transition:width .3s ease; }
       .dash-ex-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
       .dash-ex-row + .dash-ex-row { border-top:1px solid rgba(255,255,255,.05); }
       .dash-ex-name { font-size:12px; font-weight:500; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .dash-ex-freq { font-size:11px; color:var(--text-muted); font-variant-numeric:tabular-nums; width:40px; text-align:right; }
       .dash-spark { display:flex; align-items:flex-end; gap:1px; height:20px; }
       .dash-spark-bar { width:4px; border-radius:1px; min-height:1px; }
-      .dash-ex-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
       /* --- Zone dot --- */
       .tile-zone { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
@@ -157,48 +151,44 @@
     <script>
       /* ====== CONFIG ====== */
       const EXERCISES = [
-          /* Motor control — 5x/week */
-          {id:"side-plank",         name:"Side Plank",           unit:"sec",  dpw:5, clr:"motor", loadable:true},
-          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", dpw:5, clr:"motor"},
-          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  dpw:5, clr:"motor"},
-          {id:"dead-bug",           name:"Dead Bug",             unit:"reps", dpw:5, clr:"motor"},
-          {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", dpw:5, clr:"motor"},
+          /* Motor control */
+          {id:"side-plank",         name:"Side Plank",           unit:"sec",  clr:"motor", loadable:true},
+          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", clr:"motor"},
+          {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  clr:"motor"},
+          {id:"dead-bug",           name:"Dead Bug",             unit:"reps", clr:"motor"},
+          {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", clr:"motor"},
 
-          /* Rehab strengthening — 3x/week */
-          {id:"suitcase-carry",		  name:"Suitcase Carry",		 unit:"sec",  dpw:3, clr:"rehab"},
-          {id:"glute-bridge",		  name:"Glute Bridge",			 unit:"reps", dpw:3, clr:"rehab", loadable:true},
-          {id:"clamshell",		  name:"Clamshell",			 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"draken",			  name:"Draken",			 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"rubber-band-archer",	  name:"Rubber Band Archer Pull",	 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"rubber-band-row",	  name:"Rubber Band Row",		 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"banded-air-cycling",	  name:"Banded Air Cycling",		 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"sprint-pull",		  name:"Sprint Pull",			 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"banded-er-90",		  name:"Banded 90/90 External Rotation", unit:"reps", dpw:3, clr:"rehab"},
-          {id:"banded-serratus-punch",	  name:"Banded Serratus Punch",		 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"banded-pull-apart-raise",  name:"Banded Pull-Apart with Raise",	 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"arm-circles",		  name:"Arm Circles",			 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"elevated-hip-flexor-hold", name:"Elevated Hip Flexor Hold",	 unit:"reps", dpw:3, clr:"rehab"},
-          {id:"band-squat-lateral-step",  name:"Band Squat with Lateral Step", 	 unit:"reps", dpw:3, clr:"rehab"},
+          /* Rehab strengthening */
+          {id:"suitcase-carry",		  name:"Suitcase Carry",		 unit:"sec",  clr:"rehab"},
+          {id:"glute-bridge",		  name:"Glute Bridge",			 unit:"reps", clr:"rehab", loadable:true},
+          {id:"clamshell",		  name:"Clamshell",			 unit:"reps", clr:"rehab"},
+          {id:"draken",			  name:"Draken",			 unit:"reps", clr:"rehab"},
+          {id:"rubber-band-archer",	  name:"Rubber Band Archer Pull",	 unit:"reps", clr:"rehab"},
+          {id:"rubber-band-row",	  name:"Rubber Band Row",		 unit:"reps", clr:"rehab"},
+          {id:"banded-air-cycling",	  name:"Banded Air Cycling",		 unit:"reps", clr:"rehab"},
+          {id:"sprint-pull",		  name:"Sprint Pull",			 unit:"reps", clr:"rehab"},
+          {id:"banded-er-90",		  name:"Banded 90/90 External Rotation", unit:"reps", clr:"rehab"},
+          {id:"banded-serratus-punch",	  name:"Banded Serratus Punch",		 unit:"reps", clr:"rehab"},
+          {id:"banded-pull-apart-raise",  name:"Banded Pull-Apart with Raise",	 unit:"reps", clr:"rehab"},
+          {id:"arm-circles",		  name:"Arm Circles",			 unit:"reps", clr:"rehab"},
+          {id:"elevated-hip-flexor-hold", name:"Elevated Hip Flexor Hold",	 unit:"reps", clr:"rehab"},
+          {id:"band-squat-lateral-step",  name:"Band Squat with Lateral Step", 	 unit:"reps", clr:"rehab"},
 
-          /* Strength — 3x/week per exercise: needs 48-72h recovery */
-          {id:"pushups",            name:"Push-Ups",             unit:"reps", dpw:3, clr:"strength"},
-          {id:"pullups",            name:"Pull-Ups",             unit:"reps", dpw:3, clr:"strength"},
-          {id:"shoulder-press",      name:"Shoulder Press",       unit:"reps", dpw:3, clr:"strength", loadable:true},
-          {id:"deadlift",            name:"Deadlift",             unit:"reps", dpw:3, clr:"strength", loadable:true},
+          /* Strength */
+          {id:"pushups",            name:"Push-Ups",             unit:"reps", clr:"strength"},
+          {id:"pullups",            name:"Pull-Ups",             unit:"reps", clr:"strength"},
+          {id:"shoulder-press",      name:"Shoulder Press",       unit:"reps", clr:"strength", loadable:true},
+          {id:"deadlift",            name:"Deadlift",             unit:"reps", clr:"strength", loadable:true},
 
-          /* Conditioning — pooled 2x/week: pick any, interchangeable cardio */
-          {id:"walking",            name:"Walking",              unit:"100m", dpw:2, clr:"cond"},
-          {id:"running",            name:"Running",              unit:"100m", dpw:2, clr:"cond"},
-          {id:"swimming",           name:"Swimming",             unit:"25m", dpw:2, clr:"cond"},
-          {id:"skiing",             name:"Skiing",               unit:"km",   dpw:2, clr:"cond"}
+          /* Conditioning */
+          {id:"walking",            name:"Walking",              unit:"100m", clr:"cond"},
+          {id:"running",            name:"Running",              unit:"100m", clr:"cond"},
+          {id:"swimming",           name:"Swimming",             unit:"25m", clr:"cond"},
+          {id:"skiing",             name:"Skiing",               unit:"km",   clr:"cond"}
       ];
 
       const CLR_MAP = { motor:'var(--clr-motor)', rehab:'var(--clr-rehab)', strength:'var(--clr-strength)', cond:'var(--clr-cond)' };
       const SECTION_LABELS = { motor:'Motor Control', rehab:'Rehab Strengthening', strength:'Strength', cond:'Conditioning' };
-      // Categories with pooled frequency: target is shared across all exercises in the category
-      // (e.g., "do any form of cardio 2x/week" rather than "run 2x AND swim 2x AND ski 2x")
-      const CAT_DPW = { cond: 2 };
-
       // Loadable exercises gain a weight stepper and a Weight chart. WEIGHT_STEP
       // is how much one +/- tap changes the load, in WEIGHT_UNIT. The middle
       // stepper is labelled from the unit, so timed and counted exercises share
@@ -216,10 +206,6 @@
               body: `<p>Your current volume EWMA as a percentage of your best established green-zone baseline.</p>
                      <code>Zone position = current 14-day EWMA ÷ best 60-day baseline EWMA × 100%</code>
                      <p>Below 100% is grey, 100–115% is green, above 115% is yellow, and above 130% is red. The baseline needs at least 90 days of history before this statistic appears.</p>`
-          },
-          'week-frequency': {
-              title: 'This week',
-              body: `<p>The number of days this exercise was recorded during the sliding seven-day period ending today, compared with its weekly target. Conditioning exercises share one category target.</p>`
           },
           'week-volume': {
               title: 'Weekly volume',
@@ -314,10 +300,6 @@
           'days-active-week': {
               title: 'Days active this week',
               body: `<p>The number of days during the sliding seven-day period ending today on which at least one exercise was recorded.</p>`
-          },
-          'on-track': {
-              title: 'Exercises on track',
-              body: `<p>The number of exercises that have met their frequency target during the sliding seven-day period, or have been completed today. Conditioning exercises use their shared category target.</p>`
           },
           'done-today': {
               title: 'Exercises done today',
@@ -597,43 +579,6 @@
           return best;
       }
 
-      /* ====== ON-TRACK LOGIC (sliding 7-day window) ====== */
-      function getCurrentWeekProgress(id) {
-          const today = new Date(todayStr());
-          let days = 0;
-          for (let i = 0; i < 7; i++) {
-              const ds = isoDate(addDays(today, -i));
-              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-              if (v > 0) days++;
-          }
-          return days;
-      }
-
-      function getCategoryWeekProgress(cat) {
-          const today = new Date(todayStr());
-          const catExercises = EXERCISES.filter(e => e.clr === cat);
-          let days = 0;
-          for (let i = 0; i < 7; i++) {
-              const ds = isoDate(addDays(today, -i));
-              const anyDone = catExercises.some(ex =>
-                  parseInt(localStorage.getItem(keysFor(ex.id, ds).count) || "0", 10) > 0
-              );
-              if (anyDone) days++;
-          }
-          return days;
-      }
-
-      function isOnTrack(id, dpw) {
-          const todayCount = parseInt(localStorage.getItem(keysFor(id, todayStr()).count) || "0", 10);
-          if (todayCount > 0) return true;
-          const ex = EXERCISES.find(e => e.id === id);
-          const pooledDpw = ex ? CAT_DPW[ex.clr] : undefined;
-          if (pooledDpw !== undefined) {
-              return getCategoryWeekProgress(ex.clr) >= pooledDpw;
-          }
-          return getCurrentWeekProgress(id) >= dpw;
-      }
-
       /* ====== EXPORT / IMPORT ====== */
       function exportData() {
           const data = getAllData();
@@ -723,13 +668,12 @@
               }
               const count = parseInt(localStorage.getItem(keysFor(x.id, today).count) || "0", 10);
               const c = isNaN(count) ? 0 : count;
-              const done = isOnTrack(x.id, x.dpw);
+              const done = c > 0;
               const zone = progressZone(x.id);
               html += `
       <a class="list-item${done?' done':''}" href="#${x.id}" aria-label="${x.name}" style="--item-accent:${CLR_MAP[x.clr]}">
         <div class="list-item-text">
           <div class="list-item-name" style="color:${CLR_MAP[x.clr]}">${x.name}</div>
-          <div class="list-item-meta">${CAT_DPW[x.clr] !== undefined ? x.dpw + 'x/wk shared' : x.dpw + 'x/wk'}</div>
         </div>
         <div class="list-item-right">
           <div class="list-item-count">
@@ -868,7 +812,7 @@
 
           const showSaved = () => { $status.textContent = 'Saved'; $status.style.opacity='1'; setTimeout(()=>{$status.style.opacity='.5';},250); };
           const formatAvg = (v) => v % 1 === 0 ? String(v) : v.toFixed(1);
-          const daysAgo = (date) => date ? `${daysBetween(date, todayStr())} days ago` : '—';
+          const daysSince = (date) => date ? String(daysBetween(date, todayStr())) : '—';
           function trendArrow(current, previous) {
               if (current > previous) return '<span class="stat-arrow-up">&#9650;</span>';
               if (current < previous) return '<span class="stat-arrow-down">&#9660;</span>';
@@ -935,14 +879,6 @@
               const thisWeek = getWeekTotal(id, 0);
               const lastWeek = getWeekTotal(id, 1);
               const arrow = trendArrow(thisWeek, lastWeek);
-              const pooledDpw = CAT_DPW[ex.clr];
-              let weekDays, targetDpw, freqLabel;
-              if (pooledDpw !== undefined) {
-                  weekDays = getCategoryWeekProgress(ex.clr); targetDpw = pooledDpw; freqLabel = `${pooledDpw}x/wk shared`;
-              } else {
-                  weekDays = getCurrentWeekProgress(id); targetDpw = ex.dpw; freqLabel = `${ex.dpw}x/wk`;
-              }
-
               const ewma = ewmaWeeklyAt(data, new Date(todayStr()), VOL_OPTS);
               const ewmaBest = bestDisplayEwma(data, VOL_OPTS);
               const bestWk = bestWeekEver(data);
@@ -956,7 +892,6 @@
 
               return [
                   statTile(zonePct !== null ? zonePct + '%' : '—', 'Zone position', 'zone-volume'),
-                  statTile(`${weekDays}/${targetDpw}`, `This wk (${freqLabel})`, 'week-frequency'),
                   statTile(`${arrow} ${thisWeek}`, `Wk vol (prev ${lastWeek})`, 'week-volume'),
                   statTile(formatAvg(ewma), 'EWMA/wk', 'ewma-volume'),
                   statTile(`${trendSign}${trendVal}%`, '90-day trend/mo', 'trend-volume'),
@@ -965,7 +900,7 @@
                   statTile(bestWk, 'Best wk', 'best-week'),
                   statTile(total, `All-time ${ex.unit}`, 'all-time'),
                   statTile(sortedDates.length, 'Days recorded', 'days-recorded'),
-                  statTile(daysAgo(startDate), 'Since', 'since-volume')
+                  statTile(daysSince(startDate), 'Since', 'since-volume')
               ].join('');
           }
 
@@ -996,7 +931,7 @@
                   statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
                   statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
                   statTile(dates.length, 'Days weighted', 'days-weighted'),
-                  statTile(daysAgo(dates[0]), 'Since', 'since-weight')
+                  statTile(daysSince(dates[0]), 'Since', 'since-weight')
               ].join('');
           }
 
@@ -1010,8 +945,8 @@
 
           // Metric descriptors for the generic zone chart.
           const METRICS = {
-              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk' },
-              weight: { series: () => weightSeries(id), opts: WT_OPTS, label: `Weight (${WEIGHT_UNIT})` }
+              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk', unit: `${ex.unit}/wk` },
+              weight: { series: () => weightSeries(id), opts: WT_OPTS, label: `Weight (${WEIGHT_UNIT})`, unit: WEIGHT_UNIT }
           };
 
           function prepCanvas() {
@@ -1046,20 +981,23 @@
           function getHistoryWindow(endISO, days) {
               const end = new Date(endISO);
               const start = addDays(end, -(days - 1));
-              const labels = [], counts = [], setsArr = [];
+              const dates = [], labels = [], counts = [], setsArr = [];
               for (let i = 0; i < days; i++) {
                   const ds = isoDate(addDays(start, i));
                   const e = readEntry(id, ds);
+                  dates.push(ds);
                   labels.push(ds.slice(5));
                   counts.push(e.count);
                   setsArr.push(e.count > 0 ? Math.max(1, e.sets) : 0);
               }
-              return { labels, counts, setsArr, startISO: isoDate(start), endISO: isoDate(end) };
+              return { dates, labels, counts, setsArr, startISO: isoDate(start), endISO: isoDate(end) };
           }
+
+          let activeChartPoints = [];
 
           function drawDaily() {
               const endISO = isoDate(addDays(new Date(todayStr()), -offsetDays));
-              const { labels, counts, setsArr, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
+              const { dates, labels, counts, setsArr, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
               const { ctx, cssW, cssH } = prepCanvas();
 
               const pad = { l: 32, r: 8, t: 8, b: 24 };
@@ -1086,6 +1024,12 @@
               ctx.fillText(String(maxV), pad.l - 6, pad.t);
 
               const startX = pad.l;
+              activeChartPoints = dates.map((date, i) => ({
+                  date,
+                  value: counts[i],
+                  unit: ex.unit,
+                  x: startX + i * (barW + barGap) + barW / 2
+              }));
               for (let i = 0; i < counts.length; i++) {
                   const v = counts[i];
                   if (v <= 0) continue;
@@ -1205,6 +1149,7 @@
               const { ctx, cssW, cssH } = prepCanvas();
 
               if (curve.length === 0) {
+                  activeChartPoints = [];
                   $label.textContent = `${m.label}  —  no data yet`;
                   return;
               }
@@ -1223,6 +1168,12 @@
               const curveX = i => pad.l + (i / (nd - 1)) * w;
               const bandX = i => pad.l + (i / (nb - 1)) * w;
               pxPerWeek = w / (nb - 1);
+              activeChartPoints = curve.map((point, i) => ({
+                  date: point.date,
+                  value: point.value,
+                  unit: m.unit,
+                  x: curveX(i)
+              }));
 
               const first = band.findIndex(p => p.target > 0);
               if (first >= 0) {
@@ -1291,11 +1242,17 @@
 
               ctx.fillStyle = 'rgba(255,255,255,0.4)';
               ctx.font = '10px -apple-system, system-ui, Arial';
-              ctx.textAlign = 'center';
               ctx.textBaseline = 'top';
-              const step = Math.max(1, Math.ceil(nd / 6));
-              for (let i = 0; i < nd; i += step) {
-                  ctx.fillText(curve[i].date.slice(5), curveX(i), pad.t + h + 5);
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              let previousMonth = '';
+              for (let i = 0; i < nd; i++) {
+                  const monthKey = curve[i].date.slice(0, 7);
+                  if (monthKey === previousMonth) continue;
+                  previousMonth = monthKey;
+                  const monthIndex = parseInt(curve[i].date.slice(5, 7), 10) - 1;
+                  ctx.textAlign = i === 0 ? 'left' : 'center';
+                  ctx.fillText(monthNames[monthIndex], curveX(i), pad.t + h + 5);
               }
 
               $label.textContent = `${m.label}  —  ${curve[0].date} → ${curve[nd - 1].date}`;
@@ -1304,6 +1261,16 @@
           function drawActiveChart() {
               if (view === 'daily') drawDaily();
               else drawZone(view);
+          }
+
+          function showChartValue(clientX) {
+              if (activeChartPoints.length === 0) return;
+              const x = clientX - $chart.getBoundingClientRect().left;
+              let nearest = activeChartPoints[0];
+              for (const point of activeChartPoints) {
+                  if (Math.abs(point.x - x) < Math.abs(nearest.x - x)) nearest = point;
+              }
+              $label.textContent = `${nearest.date}  —  ${formatAvg(nearest.value)} ${nearest.unit}`;
           }
 
           function redrawAll() {
@@ -1331,6 +1298,7 @@
               startX = e.clientX;
               $chart.setPointerCapture(e.pointerId);
               $chart.style.cursor = 'grabbing';
+              showChartValue(e.clientX);
           });
           $chart.addEventListener('pointermove', (e) => {
               if (!dragging) return;
@@ -1342,12 +1310,14 @@
                   const deltaWeeks = Math.round(dx / pxPerWeek);
                   if (deltaWeeks !== 0) { zoneOffsetWeeks = clamp(zoneOffsetWeeks + deltaWeeks, 0, maxZoneOffset); startX += deltaWeeks * pxPerWeek; drawActiveChart(); }
               }
+              showChartValue(e.clientX);
           });
           function endDrag(e) {
               if (!dragging) return;
               dragging = false;
               $chart.style.cursor = 'grab';
               try { $chart.releasePointerCapture(e.pointerId); } catch {}
+              drawActiveChart();
           }
           $chart.addEventListener('pointerup', endDrag);
           $chart.addEventListener('pointercancel', endDrag);
@@ -1404,8 +1374,6 @@
               }
               if (anyDone) daysActiveThisWeek++;
           }
-          const onTrackCount = EXERCISES.filter(ex => isOnTrack(ex.id, ex.dpw)).length;
-
           // Group by category (data-driven from clr field)
           const categories = [];
           const seen = new Set();
@@ -1423,7 +1391,6 @@
     </div>
     <div class="dash-overall fade">
       ${statTile(`${daysActiveThisWeek}/7`, 'Days active this wk', 'days-active-week')}
-      ${statTile(`${onTrackCount}/${EXERCISES.length}`, 'On track', 'on-track')}
       ${statTile(`${EXERCISES.filter(ex => parseInt(localStorage.getItem(keysFor(ex.id, today).count) || "0", 10) > 0).length}/${EXERCISES.length}`, 'Done today', 'done-today')}
     </div>`;
 
@@ -1432,32 +1399,13 @@
               const catLabel = SECTION_LABELS[cat] || cat;
               const catColor = CLR_MAP[cat] || 'var(--accent)';
 
-              // Category completion: % of exercises on track
-              const catOnTrack = exs.filter(ex => isOnTrack(ex.id, ex.dpw)).length;
-              const catPct = Math.round((catOnTrack / exs.length) * 100);
-
               html += `<div class="dash-cat fade">
         <div class="dash-cat-header">
           <div class="dash-cat-title" style="color:${catColor}">${catLabel}</div>
-          <div class="dash-cat-pct" style="color:${catPct === 100 ? '#4ade80' : catColor}">${catPct}%</div>
         </div>
-        <div class="dash-bar-track">
-          <div class="dash-bar-fill" style="width:${catPct}%;background:${catColor}"></div>
-        </div>`;
-
-              const pooledDpw = CAT_DPW[cat];
-              const pooledProgress = pooledDpw !== undefined ? getCategoryWeekProgress(cat) : null;
+        `;
 
               for (const ex of exs) {
-                  const onTrack = isOnTrack(ex.id, ex.dpw);
-                  let freqLabel;
-                  if (pooledDpw !== undefined) {
-                      freqLabel = `${pooledProgress}/${pooledDpw} this wk`;
-                  } else {
-                      const done = getCurrentWeekProgress(ex.id);
-                      freqLabel = `${done}/${ex.dpw} this wk`;
-                  }
-
                   // Sparkline: last 7 days
                   const sparkVals = [];
                   for (let i = 6; i >= 0; i--) {
@@ -1471,14 +1419,10 @@
                       return `<div class="dash-spark-bar" style="height:${h}px;background:${catColor};opacity:${opacity}"></div>`;
                   }).join('');
 
-                  const statusColor = onTrack ? '#4ade80' : 'rgba(255,255,255,.15)';
-
                   html += `
         <div class="dash-ex-row">
-          <div class="dash-ex-status" style="background:${statusColor}"></div>
           <a href="#${ex.id}" class="dash-ex-name" style="color:var(--text);text-decoration:none">${ex.name}</a>
           <div class="dash-spark">${sparkBars}</div>
-          <div class="dash-ex-freq">${freqLabel}</div>
         </div>`;
               }
 
