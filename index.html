@@ -72,7 +72,7 @@
       .seg button { border:0; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; padding:6px 12px; cursor:pointer; transition:background .15s ease, color .15s ease; }
       .seg button + button { border-left:1px solid var(--card-border); }
       .seg button.active { background:#2a2a40; color:var(--text); }
-      canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
+      canvas { width:100%; height:180px; display:block; cursor:crosshair; touch-action:none; }
 
       /* --- Toolbar --- */
       .toolbar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
@@ -179,6 +179,11 @@
           {id:"pullups",            name:"Pull-Ups",             unit:"reps", clr:"strength"},
           {id:"shoulder-press",      name:"Shoulder Press",       unit:"reps", clr:"strength", loadable:true},
           {id:"deadlift",            name:"Deadlift",             unit:"reps", clr:"strength", loadable:true},
+          {id:"split-squat",         name:"Split Squat",          unit:"reps", clr:"strength", loadable:true},
+          {id:"sumo-squat",          name:"Sumo Squat",           unit:"reps", clr:"strength", loadable:true},
+          {id:"romanian-deadlift",   name:"Romanian Deadlift",    unit:"reps", clr:"strength", loadable:true},
+          {id:"bulgarian-split-squat", name:"Bulgarian Split Squat", unit:"reps", clr:"strength", loadable:true},
+          {id:"farmers-walk",        name:"Farmer's Walk",        unit:"sec",  clr:"strength", loadable:true},
 
           /* Conditioning */
           {id:"walking",            name:"Walking",              unit:"100m", clr:"cond"},
@@ -219,10 +224,10 @@
                      <p>It uses today and the previous 55 days. Influence halves every 14 days; unrecorded days count as zero. The ×7 converts the weighted daily average into a weekly rate.</p>`
           },
           'trend-volume': {
-              title: '90-day trend per month',
-              body: `<p>The general direction of your volume EWMA over the most recent 90 calendar days, expressed as a percentage per 30 days.</p>
-                     <code>b = Σ((day − mean day) × (EWMA − mean EWMA)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean EWMA × 100%</code>
-                     <p>A value of +12% means the fitted monthly change equals about 12% of the average EWMA during those 90 days. It uses a best-fit line rather than only comparing two endpoints, is not a compounded growth rate, and does not change when the chart is panned.</p>`
+              title: 'Green-zone trend per month',
+              body: `<p>The growth rate of the green zone's lower edge, expressed as a percentage per 30 days. It follows the running-best slow baseline—not the blue display-EWMA curve.</p>
+                     <code>b = Σ((day − mean day) × (green baseline − mean baseline)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean green baseline × 100%</code>
+                     <p>It uses at most the latest 90 days and never includes dates before the green zone activates, 90 calendar days after the first recorded volume. Because the green baseline can only ratchet upward, this trend cannot meaningfully be negative. It is a linear rate, not compounded growth.</p>`
           },
           'green-volume': {
               title: 'Green zone per week',
@@ -271,10 +276,10 @@
                      <p>Only weighted training days enter the average. It uses a 60-day half-life, a 240-day window, and activates after 90 days of history.</p>`
           },
           'trend-weight': {
-              title: '90-day weight trend per month',
-              body: `<p>The general direction of your smoothed weight level over the most recent 90 calendar days, expressed as a percentage per 30 days.</p>
-                     <code>b = Σ((day − mean day) × (level − mean level)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean level × 100%</code>
-                     <p>It uses a best-fit line through all 90 daily levels. The percentage is relative to their 90-day average, is not compounded, and is independent of the visible chart range.</p>`
+              title: 'Weight green-zone trend per month',
+              body: `<p>The growth rate of the weight green zone's lower edge, expressed as a percentage per 30 days. It follows the running-best slow weight baseline—not the current smoothed weight level.</p>
+                     <code>b = Σ((day − mean day) × (green baseline − mean baseline)) ÷ Σ((day − mean day)²)<br>Trend/mo = 30 × b ÷ mean green baseline × 100%</code>
+                     <p>It uses at most the latest 90 days and never includes dates before the weight green zone activates, 90 calendar days after the first logged load. It is a linear rate and cannot meaningfully be negative because the baseline only ratchets upward.</p>`
           },
           'ewma-best-weight': {
               title: 'Best weight EWMA',
@@ -519,14 +524,30 @@
           return (n * sxy - sx * sy) / denom;
       }
 
-      function trendPercentPerMonth(data, days, opts) {
+      /* Percentage trend of the running-best slow baseline that forms the
+         green zone's lower edge. The analysis is capped at `days` and cannot
+         begin before the baseline becomes eligible. */
+      function greenZoneTrendPercentPerMonth(data, days, opts) {
+          const dates = Object.keys(data).sort();
+          if (dates.length === 0) return null;
           const today = new Date(todayStr());
+          const eligibleDate = addDays(new Date(dates[0]), BASELINE_MIN_DAYS);
+          if (eligibleDate > today) return null;
+
+          const requestedStart = addDays(today, -(days - 1));
+          const analysisStart = eligibleDate > requestedStart ? eligibleDate : requestedStart;
           const vals = [];
-          for (let i = days - 1; i >= 0; i--) {
-              vals.push(ewmaWeeklyAt(data, addDays(today, -i), opts));
+          let runningBest = 0;
+          const eligibleSpan = daysBetween(isoDate(eligibleDate), todayStr());
+          for (let i = 0; i <= eligibleSpan; i++) {
+              const date = addDays(eligibleDate, i);
+              const baseline = baselineAt(data, date, opts);
+              if (baseline > runningBest) runningBest = baseline;
+              if (date >= analysisStart) vals.push(runningBest);
           }
+          if (vals.length < 2) return null;
           const mean = vals.reduce((sum, value) => sum + value, 0) / vals.length;
-          if (mean === 0) return 0;
+          if (mean === 0) return null;
           const monthlyChange = linRegSlope(vals) * 30;
           return (monthlyChange / mean) * 100;
       }
@@ -886,15 +907,16 @@
               const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
               const zoneLow = Math.floor(zoneBase);
               const zoneHigh = Math.ceil(zoneBase * ZONE_TOP);
-              const trend90 = trendPercentPerMonth(data, 90, VOL_OPTS);
-              const trendSign = trend90 > 0.05 ? '+' : trend90 < -0.05 ? '' : '±';
-              const trendVal = Math.abs(trend90) < 0.05 ? '0' : formatAvg(trend90);
+              const greenTrend = greenZoneTrendPercentPerMonth(data, 90, VOL_OPTS);
+              const trendSign = greenTrend !== null && greenTrend > 0.05 ? '+' : '±';
+              const trendVal = greenTrend === null ? '—' : Math.abs(greenTrend) < 0.05 ? '0' : formatAvg(greenTrend);
+              const trendDisplay = greenTrend === null ? trendVal : `${trendSign}${trendVal}%`;
 
               return [
                   statTile(zonePct !== null ? zonePct + '%' : '—', 'Zone position', 'zone-volume'),
                   statTile(`${arrow} ${thisWeek}`, `Wk vol (prev ${lastWeek})`, 'week-volume'),
                   statTile(formatAvg(ewma), 'EWMA/wk', 'ewma-volume'),
-                  statTile(`${trendSign}${trendVal}%`, '90-day trend/mo', 'trend-volume'),
+                  statTile(trendDisplay, 'Green trend/mo', 'trend-volume'),
                   statTile(zoneBase > 0 ? zoneLow + '–' + zoneHigh : '—', 'Green zone/wk', 'green-volume'),
                   statTile(formatAvg(ewmaBest), 'EWMA/wk best', 'ewma-best-volume'),
                   statTile(bestWk, 'Best wk', 'best-week'),
@@ -916,9 +938,10 @@
               const ewmaBest = bestDisplayEwma(data, WT_OPTS);
               const base = bestEwma(data, WT_OPTS);
               const pct = base > 0 ? Math.round((ewma / base) * 100) : null;
-              const trend90 = trendPercentPerMonth(data, 90, WT_OPTS);
-              const trendSign = trend90 > 0.05 ? '+' : trend90 < -0.05 ? '' : '±';
-              const trendVal = Math.abs(trend90) < 0.05 ? '0' : formatAvg(trend90);
+              const greenTrend = greenZoneTrendPercentPerMonth(data, 90, WT_OPTS);
+              const trendSign = greenTrend !== null && greenTrend > 0.05 ? '+' : '±';
+              const trendVal = greenTrend === null ? '—' : Math.abs(greenTrend) < 0.05 ? '0' : formatAvg(greenTrend);
+              const trendDisplay = greenTrend === null ? trendVal : `${trendSign}${trendVal}%`;
               const heaviest = Math.max(...Object.values(data));
               const latest = data[dates[dates.length - 1]];
 
@@ -926,7 +949,7 @@
                   statTile(pct !== null ? pct + '%' : '—', 'Zone position', 'zone-weight'),
                   statTile(formatAvg(ewma), `Level ${u}`, 'weight-level'),
                   statTile(base > 0 ? formatAvg(base) + '–' + formatAvg(base * ZONE_TOP) : '—', `Green zone ${u}`, 'green-weight'),
-                  statTile(`${trendSign}${trendVal}%`, '90-day trend/mo', 'trend-weight'),
+                  statTile(trendDisplay, 'Green trend/mo', 'trend-weight'),
                   statTile(formatAvg(ewmaBest), `EWMA best ${u}`, 'ewma-best-weight'),
                   statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
                   statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
@@ -1289,39 +1312,56 @@
               updateStats();
           });
 
-          /* ---------- chart pan / zoom ---------- */
-          let dragging = false;
-          let startX = 0;
+          /* ---------- one-finger inspection, two-finger pan ---------- */
+          const chartPointers = new Map();
+          let chartGesture = null;
+          let panCenterX = 0;
+
+          function twoFingerCenter() {
+              const positions = [...chartPointers.values()];
+              return (positions[0] + positions[1]) / 2;
+          }
 
           $chart.addEventListener('pointerdown', (e) => {
-              dragging = true;
-              startX = e.clientX;
+              chartPointers.set(e.pointerId, e.clientX);
               $chart.setPointerCapture(e.pointerId);
-              $chart.style.cursor = 'grabbing';
-              showChartValue(e.clientX);
+              if (chartPointers.size === 1) {
+                  chartGesture = 'inspect';
+                  showChartValue(e.clientX);
+              } else if (chartPointers.size === 2) {
+                  chartGesture = 'pan';
+                  panCenterX = twoFingerCenter();
+                  drawActiveChart();
+              }
           });
           $chart.addEventListener('pointermove', (e) => {
-              if (!dragging) return;
-              const dx = e.clientX - startX;
-              if (view === 'daily') {
-                  const deltaDays = Math.round(dx / pxPerDay);
-                  if (deltaDays !== 0) { offsetDays = clamp(offsetDays + deltaDays, 0, maxOffsetDays); startX += deltaDays * pxPerDay; drawActiveChart(); }
-              } else {
-                  const deltaWeeks = Math.round(dx / pxPerWeek);
-                  if (deltaWeeks !== 0) { zoneOffsetWeeks = clamp(zoneOffsetWeeks + deltaWeeks, 0, maxZoneOffset); startX += deltaWeeks * pxPerWeek; drawActiveChart(); }
+              if (!chartPointers.has(e.pointerId)) return;
+              chartPointers.set(e.pointerId, e.clientX);
+              if (chartGesture === 'inspect' && chartPointers.size === 1) {
+                  showChartValue(e.clientX);
+                  return;
               }
-              showChartValue(e.clientX);
-          });
-          function endDrag(e) {
-              if (!dragging) return;
-              dragging = false;
-              $chart.style.cursor = 'grab';
-              try { $chart.releasePointerCapture(e.pointerId); } catch {}
+              if (chartGesture !== 'pan' || chartPointers.size < 2) return;
+
+              const centerX = twoFingerCenter();
+              const pixelsPerStep = view === 'daily' ? pxPerDay : pxPerWeek;
+              const delta = Math.round((centerX - panCenterX) / pixelsPerStep);
+              if (delta === 0) return;
+              if (view === 'daily') offsetDays = clamp(offsetDays + delta, 0, maxOffsetDays);
+              else zoneOffsetWeeks = clamp(zoneOffsetWeeks + delta, 0, maxZoneOffset);
+              panCenterX += delta * pixelsPerStep;
               drawActiveChart();
+          });
+          function endChartGesture(e) {
+              chartPointers.delete(e.pointerId);
+              try { $chart.releasePointerCapture(e.pointerId); } catch {}
+              if (chartPointers.size === 0) {
+                  chartGesture = null;
+                  drawActiveChart();
+              }
           }
-          $chart.addEventListener('pointerup', endDrag);
-          $chart.addEventListener('pointercancel', endDrag);
-          $chart.addEventListener('pointerleave', endDrag);
+          $chart.addEventListener('pointerup', endChartGesture);
+          $chart.addEventListener('pointercancel', endChartGesture);
 
           $chart.addEventListener('wheel', (e) => {
               e.preventDefault();
