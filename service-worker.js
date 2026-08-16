@@ -1,4 +1,4 @@
-const APP_VERSION = '2026-08-16-3';
+const APP_VERSION = '2026-08-16-4';
 const CACHE = `static-${APP_VERSION}`;
 const ASSETS = [
   "./",

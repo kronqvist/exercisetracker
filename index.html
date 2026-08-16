@@ -72,7 +72,7 @@
       .seg button { border:0; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; padding:6px 12px; cursor:pointer; transition:background .15s ease, color .15s ease; }
       .seg button + button { border-left:1px solid var(--card-border); }
       .seg button.active { background:#2a2a40; color:var(--text); }
-      canvas { width:100%; height:180px; display:block; cursor:crosshair; touch-action:none; }
+      canvas { width:100%; height:180px; display:block; cursor:grab; touch-action:none; }
 
       /* --- Toolbar --- */
       .toolbar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
@@ -172,7 +172,7 @@
           {id:"banded-pull-apart-raise",  name:"Banded Pull-Apart with Raise",	 unit:"reps", clr:"rehab"},
           {id:"arm-circles",		  name:"Arm Circles",			 unit:"reps", clr:"rehab"},
           {id:"elevated-hip-flexor-hold", name:"Elevated Hip Flexor Hold",	 unit:"reps", clr:"rehab"},
-          {id:"band-squat-lateral-step",  name:"Band Squat with Lateral Step", 	 unit:"reps", clr:"rehab"},
+          {id:"band-squat-lateral-step",  name:"Squat", 	 unit:"reps", clr:"rehab"},
 
           /* Strength */
           {id:"pushups",            name:"Push-Ups",             unit:"reps", clr:"strength"},
@@ -1312,51 +1312,57 @@
               updateStats();
           });
 
-          /* ---------- one-finger inspection, two-finger pan ---------- */
+          /* ---------- one-finger pan, two-finger inspection ---------- */
           const chartPointers = new Map();
           let chartGesture = null;
-          let panCenterX = 0;
+          let panPointerId = null;
+          let panX = 0;
 
           function twoFingerCenter() {
               const positions = [...chartPointers.values()];
               return (positions[0] + positions[1]) / 2;
           }
 
+          function panChart(currentX) {
+              const pixelsPerStep = view === 'daily' ? pxPerDay : pxPerWeek;
+              const delta = Math.round((currentX - panX) / pixelsPerStep);
+              if (delta === 0) return;
+              if (view === 'daily') offsetDays = clamp(offsetDays + delta, 0, maxOffsetDays);
+              else zoneOffsetWeeks = clamp(zoneOffsetWeeks + delta, 0, maxZoneOffset);
+              panX += delta * pixelsPerStep;
+              drawActiveChart();
+          }
+
           $chart.addEventListener('pointerdown', (e) => {
               chartPointers.set(e.pointerId, e.clientX);
               $chart.setPointerCapture(e.pointerId);
               if (chartPointers.size === 1) {
-                  chartGesture = 'inspect';
-                  showChartValue(e.clientX);
-              } else if (chartPointers.size === 2) {
                   chartGesture = 'pan';
-                  panCenterX = twoFingerCenter();
-                  drawActiveChart();
+                  panPointerId = e.pointerId;
+                  panX = e.clientX;
+                  $chart.style.cursor = 'grabbing';
+              } else if (chartPointers.size === 2 && view !== 'daily') {
+                  chartGesture = 'inspect';
+                  $chart.style.cursor = 'crosshair';
+                  showChartValue(twoFingerCenter());
               }
           });
           $chart.addEventListener('pointermove', (e) => {
               if (!chartPointers.has(e.pointerId)) return;
               chartPointers.set(e.pointerId, e.clientX);
-              if (chartGesture === 'inspect' && chartPointers.size === 1) {
-                  showChartValue(e.clientX);
+              if (chartGesture === 'inspect' && chartPointers.size >= 2) {
+                  showChartValue(twoFingerCenter());
                   return;
               }
-              if (chartGesture !== 'pan' || chartPointers.size < 2) return;
-
-              const centerX = twoFingerCenter();
-              const pixelsPerStep = view === 'daily' ? pxPerDay : pxPerWeek;
-              const delta = Math.round((centerX - panCenterX) / pixelsPerStep);
-              if (delta === 0) return;
-              if (view === 'daily') offsetDays = clamp(offsetDays + delta, 0, maxOffsetDays);
-              else zoneOffsetWeeks = clamp(zoneOffsetWeeks + delta, 0, maxZoneOffset);
-              panCenterX += delta * pixelsPerStep;
-              drawActiveChart();
+              if (chartGesture === 'pan' && e.pointerId === panPointerId) panChart(e.clientX);
           });
           function endChartGesture(e) {
               chartPointers.delete(e.pointerId);
               try { $chart.releasePointerCapture(e.pointerId); } catch {}
               if (chartPointers.size === 0) {
                   chartGesture = null;
+                  panPointerId = null;
+                  $chart.style.cursor = 'grab';
                   drawActiveChart();
               }
           }
