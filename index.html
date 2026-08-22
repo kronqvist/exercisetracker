@@ -159,7 +159,6 @@
           {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", clr:"motor"},
 
           /* Rehab strengthening */
-          {id:"suitcase-carry",		  name:"Suitcase Carry",		 unit:"sec",  clr:"rehab"},
           {id:"glute-bridge",		  name:"Glute Bridge",			 unit:"reps", clr:"rehab", loadable:true},
           {id:"clamshell",		  name:"Clamshell",			 unit:"reps", clr:"rehab"},
           {id:"draken",			  name:"Draken",			 unit:"reps", clr:"rehab"},
@@ -177,13 +176,12 @@
           /* Strength */
           {id:"pushups",            name:"Push-Ups",             unit:"reps", clr:"strength"},
           {id:"pullups",            name:"Pull-Ups",             unit:"reps", clr:"strength"},
+          {id:"dips",               name:"Dips",                 unit:"reps", clr:"strength"},
+          {id:"lateral-raise",      name:"Lateral Raise",        unit:"reps", clr:"strength", loadable:true},
           {id:"shoulder-press",      name:"Shoulder Press",       unit:"reps", clr:"strength", loadable:true},
           {id:"deadlift",            name:"Deadlift",             unit:"reps", clr:"strength", loadable:true},
           {id:"split-squat",         name:"Split Squat",          unit:"reps", clr:"strength", loadable:true},
           {id:"sumo-squat",          name:"Sumo Squat",           unit:"reps", clr:"strength", loadable:true},
-          {id:"romanian-deadlift",   name:"Romanian Deadlift",    unit:"reps", clr:"strength", loadable:true},
-          {id:"bulgarian-split-squat", name:"Bulgarian Split Squat", unit:"reps", clr:"strength", loadable:true},
-          {id:"farmers-walk",        name:"Farmer's Walk",        unit:"sec",  clr:"strength", loadable:true},
 
           /* Conditioning */
           {id:"walking",            name:"Walking",              unit:"100m", clr:"cond"},
@@ -267,13 +265,13 @@
               title: 'Weight level',
               body: `<p>A 14-day-half-life EWMA of the weights used during recorded sessions.</p>
                      <code>Weight level = Σ(weight × 2<sup>−age/14</sup>) ÷ Σ(2<sup>−age/14</sup>)</code>
-                     <p>It considers a 56-day calendar window, but only days with a logged load enter the average. Rest days therefore do not pull the weight level toward zero.</p>`
+                     <p>It considers a 56-day calendar window. Only performed days enter the average, including a deliberately logged 0 kg; rest days do not pull the level toward zero.</p>`
           },
           'green-weight': {
               title: 'Weight green zone',
               body: `<p>The load range anchored to the highest slow weight baseline you have established.</p>
                      <code>Baseline = Σ(weight × 2<sup>−age/60</sup>) ÷ Σ(2<sup>−age/60</sup>)<br>Green zone = best baseline to 1.15 × best baseline</code>
-                     <p>Only weighted training days enter the average. It uses a 60-day half-life, a 240-day window, and activates after 90 days of history.</p>`
+                     <p>Only performed days enter the average, including deliberately logged 0 kg sessions. It uses a 60-day half-life, a 240-day window, and activates after 90 days of history.</p>`
           },
           'trend-weight': {
               title: 'Weight green-zone trend per month',
@@ -292,15 +290,15 @@
           },
           'latest-weight': {
               title: 'Latest weight',
-              body: `<p>The weight recorded in the most recent weighted session.</p>`
+              body: `<p>The external load recorded in the most recent performed session, including 0 kg.</p>`
           },
           'days-weighted': {
-              title: 'Days weighted',
-              body: `<p>The number of calendar days with a load greater than zero recorded for this exercise.</p>`
+              title: 'Weight sessions',
+              body: `<p>The number of performed sessions with weight data. A deliberately logged 0 kg session is included.</p>`
           },
           'since-weight': {
-              title: 'Weighted since',
-              body: `<p>Days since a weight was first recorded for this exercise.</p>`
+              title: 'Weight tracked since',
+              body: `<p>Days since the first performed session with weight data, including 0 kg.</p>`
           },
           'days-active-week': {
               title: 'Days active this week',
@@ -377,7 +375,8 @@
           const sets   = setsRaw   !== null ? (parseInt(setsRaw, 10)   || 0) : 1;
           const reps   = repsRaw   !== null ? (parseInt(repsRaw, 10)   || 0) : count;
           const weight = weightRaw !== null ? (parseFloat(weightRaw)   || 0) : 0;
-          return { count, sets, reps, weight };
+          const weightRecorded = weightRaw !== null && count > 0;
+          return { count, sets, reps, weight, weightRecorded };
       }
 
       /* Write a structured entry. count = sets × reps stays the canonical daily
@@ -434,7 +433,22 @@
           return result;
       }
       const volumeSeries = (id) => seriesFor(id, 'count');
-      const weightSeries = (id) => seriesFor(id, 'weight');
+      /* A performed 0 kg session is real weight data (for example, returning to
+         bodyweight). Keep it distinct from an absent day so progress and deloads
+         are represented honestly. */
+      function weightSeries(id) {
+          const result = {};
+          for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (!k) continue;
+              const ds = parseDateKey(k, id, 'weight');
+              if (!ds) continue;
+              const count = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10) || 0;
+              const value = parseFloat(localStorage.getItem(k));
+              if (count > 0 && Number.isFinite(value) && value >= 0) result[ds] = value;
+          }
+          return result;
+      }
 
       function getAllData() {
           const result = {};
@@ -863,7 +877,7 @@
 
           function loadEntry(dateStr) {
               const e = readEntry(id, dateStr);
-              if (ex.loadable && e.weight === 0) e.weight = lastWeight;
+              if (ex.loadable && !e.weightRecorded) e.weight = lastWeight;
               entry = { sets: e.sets, reps: e.reps, weight: e.weight };
               renderSteppers();
           }
@@ -932,7 +946,7 @@
               const u = WEIGHT_UNIT;
               if (dates.length === 0) {
                   return statTile('—', 'Zone position', 'zone-weight') + statTile('—', `Level ${u}`, 'weight-level') +
-                      `<div class="stat" style="grid-column:1/-1"><div class="stat-label">No weight logged yet. Add a load above to start the weight chart.</div></div>`;
+                      `<div class="stat" style="grid-column:1/-1"><div class="stat-label">No performed sessions yet. Complete one to start the weight chart—even at 0 kg.</div></div>`;
               }
               const ewma = ewmaWeeklyAt(data, new Date(todayStr()), WT_OPTS);
               const ewmaBest = bestDisplayEwma(data, WT_OPTS);
@@ -953,7 +967,7 @@
                   statTile(formatAvg(ewmaBest), `EWMA best ${u}`, 'ewma-best-weight'),
                   statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
                   statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
-                  statTile(dates.length, 'Days weighted', 'days-weighted'),
+                  statTile(dates.length, 'Weight sessions', 'days-weighted'),
                   statTile(daysSince(dates[0]), 'Since', 'since-weight')
               ].join('');
           }
@@ -966,10 +980,10 @@
           const barColor = getComputedStyle(document.documentElement).getPropertyValue(`--clr-${ex.clr}`).trim() || '#6ea8fe';
           const chartBg  = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0c0c14';
 
-          // Metric descriptors for the generic zone chart.
+          // Volume uses the smoothed green-zone chart. Weight uses raw session
+          // bars below so changes in actual training load remain easy to read.
           const METRICS = {
-              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk', unit: `${ex.unit}/wk` },
-              weight: { series: () => weightSeries(id), opts: WT_OPTS, label: `Weight (${WEIGHT_UNIT})`, unit: WEIGHT_UNIT }
+              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk', unit: `${ex.unit}/wk` }
           };
 
           function prepCanvas() {
@@ -1112,6 +1126,34 @@
           let maxZoneOffset = 0;
           let pxPerWeek = 8;
 
+          function drawMonthLabels(ctx, points, xForIndex, y) {
+              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const ticks = [];
+              let previousMonth = '';
+              for (let i = 0; i < points.length; i++) {
+                  const monthKey = points[i].date.slice(0, 7);
+                  if (monthKey === previousMonth) continue;
+                  previousMonth = monthKey;
+                  ticks.push({ index: i, x: xForIndex(i), month: parseInt(points[i].date.slice(5, 7), 10) - 1 });
+              }
+
+              // A partial oldest month can land just before the next label.
+              // Prefer the full newer month rather than drawing two collisions.
+              if (ticks.length > 1 && ticks[1].x - ticks[0].x < 38) ticks.shift();
+
+              ctx.fillStyle = 'rgba(255,255,255,0.4)';
+              ctx.font = '10px -apple-system, system-ui, Arial';
+              ctx.textBaseline = 'top';
+              let lastX = -Infinity;
+              for (const tick of ticks) {
+                  if (tick.x - lastX < 38) continue;
+                  ctx.textAlign = tick.x < 52 ? 'left' : 'center';
+                  ctx.fillText(monthNames[tick.month], tick.x, y);
+                  lastX = tick.x;
+              }
+          }
+
           function zoneData(data, opts, numWeeks, offsetWeeks) {
               const dates = Object.keys(data).sort();
               if (dates.length === 0) return { curve: [], band: [] };
@@ -1195,7 +1237,8 @@
                   date: point.date,
                   value: point.value,
                   unit: m.unit,
-                  x: curveX(i)
+                  x: curveX(i),
+                  y: toY(point.value)
               }));
 
               const first = band.findIndex(p => p.target > 0);
@@ -1263,35 +1306,116 @@
                   ctx.setLineDash([]);
               }
 
-              ctx.fillStyle = 'rgba(255,255,255,0.4)';
-              ctx.font = '10px -apple-system, system-ui, Arial';
-              ctx.textBaseline = 'top';
-              const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-              let previousMonth = '';
-              for (let i = 0; i < nd; i++) {
-                  const monthKey = curve[i].date.slice(0, 7);
-                  if (monthKey === previousMonth) continue;
-                  previousMonth = monthKey;
-                  const monthIndex = parseInt(curve[i].date.slice(5, 7), 10) - 1;
-                  ctx.textAlign = i === 0 ? 'left' : 'center';
-                  ctx.fillText(monthNames[monthIndex], curveX(i), pad.t + h + 5);
-              }
+              drawMonthLabels(ctx, curve, curveX, pad.t + h + 5);
 
               $label.textContent = `${m.label}  —  ${curve[0].date} → ${curve[nd - 1].date}`;
           }
 
+          // Raw per-session loads make the purpose of this view explicit:
+          // compare the weight actually used over time. Zero is drawn as a
+          // hollow baseline marker so returning to bodyweight stays visible.
+          function drawWeightProgress() {
+              const data = weightSeries(id);
+              computeZoneBounds(data);
+              const { ctx, cssW, cssH } = prepCanvas();
+              const dates = Object.keys(data).sort();
+              if (dates.length === 0) {
+                  activeChartPoints = [];
+                  $label.textContent = 'Session weight  —  no performed sessions yet';
+                  return;
+              }
+
+              const end = addDays(new Date(todayStr()), -zoneOffsetWeeks * 7);
+              const start = addDays(end, -(ZONE_WEEKS * 7 - 1));
+              const startISO = isoDate(start);
+              const endISO = isoDate(end);
+              const sessions = dates
+                  .filter(date => date >= startISO && date <= endISO)
+                  .map(date => ({ date, value: data[date] }));
+              const calendar = [];
+              for (let i = 0; i < ZONE_WEEKS * 7; i++) calendar.push({ date: isoDate(addDays(start, i)) });
+
+              const pad = { l: 40, r: 8, t: 8, b: 24 };
+              const w = cssW - pad.l - pad.r;
+              const h = cssH - pad.t - pad.b;
+              const maxV = Math.max(5, ...sessions.map(point => point.value)) * 1.1;
+              const xForDate = date => pad.l + (daysBetween(startISO, date) / (ZONE_WEEKS * 7 - 1)) * w;
+              const toY = value => pad.t + h - (value / maxV) * h;
+              pxPerWeek = w / (ZONE_WEEKS - 1);
+
+              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pad.l, pad.t);
+              ctx.lineTo(pad.l, pad.t + h);
+              ctx.lineTo(pad.l + w, pad.t + h);
+              ctx.stroke();
+
+              ctx.fillStyle = 'rgba(255,255,255,0.45)';
+              ctx.font = '11px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('0', pad.l - 6, pad.t + h);
+              ctx.fillText(formatAvg(maxV), pad.l - 6, pad.t);
+
+              const barW = Math.max(3, Math.min(8, w / (ZONE_WEEKS * 4)));
+              activeChartPoints = sessions.map(point => ({
+                  ...point,
+                  unit: WEIGHT_UNIT,
+                  x: xForDate(point.date),
+                  y: toY(point.value)
+              }));
+              for (const point of activeChartPoints) {
+                  if (point.value === 0) {
+                      ctx.strokeStyle = barColor;
+                      ctx.lineWidth = 2;
+                      ctx.beginPath();
+                      ctx.arc(point.x, pad.t + h - 3, 3, 0, Math.PI * 2);
+                      ctx.stroke();
+                      point.y = pad.t + h - 3;
+                      continue;
+                  }
+                  const barHeight = Math.max(1, pad.t + h - point.y);
+                  ctx.fillStyle = barColor;
+                  ctx.globalAlpha = 0.75;
+                  ctx.fillRect(point.x - barW / 2, point.y, barW, barHeight);
+              }
+              ctx.globalAlpha = 1;
+
+              drawMonthLabels(ctx, calendar, i => pad.l + (i / (calendar.length - 1)) * w, pad.t + h + 5);
+              $label.textContent = `Session weight (${WEIGHT_UNIT})  —  ${startISO} → ${endISO}`;
+          }
+
           function drawActiveChart() {
               if (view === 'daily') drawDaily();
+              else if (view === 'weight') drawWeightProgress();
               else drawZone(view);
           }
 
           function showChartValue(clientX) {
               if (activeChartPoints.length === 0) return;
+              drawActiveChart();
               const x = clientX - $chart.getBoundingClientRect().left;
               let nearest = activeChartPoints[0];
               for (const point of activeChartPoints) {
                   if (Math.abs(point.x - x) < Math.abs(nearest.x - x)) nearest = point;
+              }
+              const ctx = $chart.getContext('2d');
+              const cssH = $chart.clientHeight;
+              ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(Math.round(nearest.x) + 0.5, 8);
+              ctx.lineTo(Math.round(nearest.x) + 0.5, cssH - 24);
+              ctx.stroke();
+              if (Number.isFinite(nearest.y)) {
+                  ctx.fillStyle = chartBg;
+                  ctx.strokeStyle = barColor;
+                  ctx.lineWidth = 2;
+                  ctx.beginPath();
+                  ctx.arc(nearest.x, nearest.y, 4, 0, Math.PI * 2);
+                  ctx.fill();
+                  ctx.stroke();
               }
               $label.textContent = `${nearest.date}  —  ${formatAvg(nearest.value)} ${nearest.unit}`;
           }
@@ -1348,7 +1472,10 @@
               }
           });
           $chart.addEventListener('pointermove', (e) => {
-              if (!chartPointers.has(e.pointerId)) return;
+              if (!chartPointers.has(e.pointerId)) {
+                  if (e.pointerType === 'mouse' && view !== 'daily') showChartValue(e.clientX);
+                  return;
+              }
               chartPointers.set(e.pointerId, e.clientX);
               if (chartGesture === 'inspect' && chartPointers.size >= 2) {
                   showChartValue(twoFingerCenter());
@@ -1368,6 +1495,9 @@
           }
           $chart.addEventListener('pointerup', endChartGesture);
           $chart.addEventListener('pointercancel', endChartGesture);
+          $chart.addEventListener('pointerleave', () => {
+              if (chartPointers.size === 0 && view !== 'daily') drawActiveChart();
+          });
 
           $chart.addEventListener('wheel', (e) => {
               e.preventDefault();
