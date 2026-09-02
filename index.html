@@ -153,7 +153,7 @@
       const EXERCISES = [
           /* Motor control */
           {id:"side-plank",         name:"Side Plank",           unit:"sec",  clr:"motor", loadable:true},
-          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", clr:"motor"},
+          {id:"bird-dog",           name:"Bird-Dog",             unit:"reps", clr:"motor", loadable:true},
           {id:"mcgill-curlup",      name:"McGill Curl-Up",       unit:"sec",  clr:"motor"},
           {id:"dead-bug",           name:"Dead Bug",             unit:"reps", clr:"motor"},
           {id:"cat-camel",          name:"Cat\u2013Camel",       unit:"reps", clr:"motor"},
@@ -219,7 +219,7 @@
               title: 'EWMA per week',
               body: `<p>A smoothed estimate of your current weekly volume. Recent sessions matter more than older sessions, so the value responds to change without jumping as sharply as a raw weekly total.</p>
                      <code>EWMA/wk = 7 × Σ(value × 2<sup>−age/14</sup>) ÷ Σ(2<sup>−age/14</sup>)</code>
-                     <p>It uses today and the previous 55 days. Influence halves every 14 days; unrecorded days count as zero. The ×7 converts the weighted daily average into a weekly rate.</p>`
+                     <p>It uses a 90-day calendar window (today and the previous 89 days). Influence halves every 14 days; unrecorded days count as zero. The ×7 converts the weighted daily average into a weekly rate.</p>`
           },
           'trend-volume': {
               title: 'Green-zone trend per month',
@@ -252,7 +252,7 @@
               body: `<p>The number of calendar days on which this exercise has a recorded volume greater than zero.</p>`
           },
           'since-volume': {
-              title: 'Since',
+              title: 'Days since first record',
               body: `<p>Days since this exercise was first recorded with a volume greater than zero.</p>`
           },
           'zone-weight': {
@@ -265,7 +265,7 @@
               title: 'Weight level',
               body: `<p>A 14-day-half-life EWMA of the weights used during recorded sessions.</p>
                      <code>Weight level = Σ(weight × 2<sup>−age/14</sup>) ÷ Σ(2<sup>−age/14</sup>)</code>
-                     <p>It considers a 56-day calendar window. Only performed days enter the average, including a deliberately logged 0 kg; rest days do not pull the level toward zero.</p>`
+                     <p>It considers a 90-day calendar window. Only performed days enter the average, including a deliberately logged 0 kg; rest days do not pull the level toward zero.</p>`
           },
           'green-weight': {
               title: 'Weight green zone',
@@ -297,7 +297,7 @@
               body: `<p>The number of performed sessions with weight data. A deliberately logged 0 kg session is included.</p>`
           },
           'since-weight': {
-              title: 'Weight tracked since',
+              title: 'Days since weight tracking began',
               body: `<p>Days since the first performed session with weight data, including 0 kg.</p>`
           },
           'days-active-week': {
@@ -473,7 +473,7 @@
       }
 
       const EWMA_HALF_LIFE = 14;
-      const EWMA_LOOKBACK = EWMA_HALF_LIFE * 4;
+      const EWMA_LOOKBACK = 90;
       const EWMA_LAMBDA = Math.LN2 / EWMA_HALF_LIFE;
 
       const BASELINE_HALF_LIFE = 60;
@@ -936,7 +936,7 @@
                   statTile(bestWk, 'Best wk', 'best-week'),
                   statTile(total, `All-time ${ex.unit}`, 'all-time'),
                   statTile(sortedDates.length, 'Days recorded', 'days-recorded'),
-                  statTile(daysSince(startDate), 'Since', 'since-volume')
+                  statTile(daysSince(startDate), 'Days since first', 'since-volume')
               ].join('');
           }
 
@@ -968,7 +968,7 @@
                   statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
                   statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
                   statTile(dates.length, 'Weight sessions', 'days-weighted'),
-                  statTile(daysSince(dates[0]), 'Since', 'since-weight')
+                  statTile(daysSince(dates[0]), 'Days since first', 'since-weight')
               ].join('');
           }
 
