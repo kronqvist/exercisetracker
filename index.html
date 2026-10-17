@@ -171,7 +171,7 @@
           {id:"banded-pull-apart-raise",  name:"Banded Pull-Apart with Raise",	 unit:"reps", clr:"rehab"},
           {id:"arm-circles",		  name:"Arm Circles",			 unit:"reps", clr:"rehab"},
           {id:"elevated-hip-flexor-hold", name:"Elevated Hip Flexor Hold",	 unit:"reps", clr:"rehab"},
-          {id:"band-squat-lateral-step",  name:"Squat", 	 unit:"reps", clr:"rehab"},
+          {id:"band-squat-lateral-step",  name:"Squat", 	 unit:"reps", clr:"rehab", loadable:true},
 
           /* Strength */
           {id:"pushups",            name:"Push-Ups",             unit:"reps", clr:"strength"},
@@ -460,18 +460,6 @@
           return result;
       }
 
-      function getWeekTotal(id, weeksAgo) {
-          const today = new Date(todayStr());
-          const end = addDays(today, -(weeksAgo * 7));
-          let total = 0;
-          for (let i = 0; i < 7; i++) {
-              const ds = isoDate(addDays(end, -i));
-              const v = parseInt(localStorage.getItem(keysFor(id, ds).count) || "0", 10);
-              if (!isNaN(v)) total += v;
-          }
-          return total;
-      }
-
       const EWMA_HALF_LIFE = 14;
       const EWMA_LOOKBACK = 90;
       const EWMA_LAMBDA = Math.LN2 / EWMA_HALF_LIFE;
@@ -483,17 +471,17 @@
       const BASELINE_MIN_DAYS = 90;
       const ZONE_TOP = 1.15;
 
-      /* Exponentially-weighted average of `data` ending at endDate.
+      /* Exponentially-weighted average of a daily array ending at endIndex.
          weekly:     scale the daily average to a weekly total (×7), for accumulations.
          activeOnly: count only days that hold data, giving a sustained level rather
                      than a rate dragged toward zero by rest days. */
-      function ewmaAt(data, endDate, lambda, lookback, opts) {
+      function ewmaAt(values, endIndex, lambda, lookback, opts) {
           let wSum = 0, wTotal = 0;
           for (let i = 0; i < lookback; i++) {
-              const ds = isoDate(addDays(endDate, -i));
-              const present = data[ds] !== undefined;
+              const value = values[endIndex - i];
+              const present = value !== undefined;
               if (opts.activeOnly && !present) continue;
-              const v = present ? data[ds] : 0;
+              const v = present ? value : 0;
               const w = Math.exp(-lambda * i);
               wSum += w * v;
               wTotal += w;
@@ -501,29 +489,6 @@
           if (wTotal === 0) return 0;
           const avg = wSum / wTotal;
           return opts.weekly ? avg * 7 : avg;
-      }
-
-      function ewmaWeeklyAt(data, endDate, opts) {
-          return ewmaAt(data, endDate, EWMA_LAMBDA, EWMA_LOOKBACK, opts);
-      }
-
-      /* Highest value reached by the same 14-day display EWMA shown in the
-         EWMA/wk tile and blue chart curve. */
-      function bestDisplayEwma(data, opts) {
-          const dates = Object.keys(data).sort();
-          if (dates.length === 0) return 0;
-          const today = new Date(todayStr());
-          const span = daysBetween(dates[0], todayStr());
-          let best = 0;
-          for (let offset = 0; offset <= span; offset++) {
-              const value = ewmaWeeklyAt(data, addDays(today, -offset), opts);
-              if (value > best) best = value;
-          }
-          return best;
-      }
-
-      function baselineAt(data, endDate, opts) {
-          return ewmaAt(data, endDate, BASELINE_LAMBDA, BASELINE_LOOKBACK, opts);
       }
 
       function linRegSlope(ys) {
@@ -538,55 +503,70 @@
           return (n * sxy - sx * sy) / denom;
       }
 
-      /* Percentage trend of the running-best slow baseline that forms the
-         green zone's lower edge. The analysis is capped at `days` and cannot
-         begin before the baseline becomes eligible. */
-      function greenZoneTrendPercentPerMonth(data, days, opts) {
+      // One daily history supplies statistics and chart samples. Missing days
+      // remain zero for volume, while weight averages only recorded sessions.
+      function analyzeSeries(data, opts, endDate = todayStr()) {
           const dates = Object.keys(data).sort();
-          if (dates.length === 0) return null;
-          const today = new Date(todayStr());
-          const eligibleDate = addDays(new Date(dates[0]), BASELINE_MIN_DAYS);
-          if (eligibleDate > today) return null;
-
-          const requestedStart = addDays(today, -(days - 1));
-          const analysisStart = eligibleDate > requestedStart ? eligibleDate : requestedStart;
-          const vals = [];
-          let runningBest = 0;
-          const eligibleSpan = daysBetween(isoDate(eligibleDate), todayStr());
-          for (let i = 0; i <= eligibleSpan; i++) {
-              const date = addDays(eligibleDate, i);
-              const baseline = baselineAt(data, date, opts);
-              if (baseline > runningBest) runningBest = baseline;
-              if (date >= analysisStart) vals.push(runningBest);
+          const history = [];
+          let baseline = 0, bestDisplay = 0, bestWeek = 0;
+          const span = dates.length ? daysBetween(dates[0], endDate) : -1;
+          const calendar = Array.from({ length: Math.max(0, span + 1) }, (_, day) => isoDate(addDays(dates[0], day)));
+          const dailyValues = calendar.map(date => data[date]);
+          for (const [day, date] of calendar.entries()) {
+              const value = ewmaAt(dailyValues, day, EWMA_LAMBDA, EWMA_LOOKBACK, opts);
+              if (day >= BASELINE_MIN_DAYS) {
+                  const candidate = ewmaAt(dailyValues, day, BASELINE_LAMBDA, BASELINE_LOOKBACK, opts);
+                  baseline = Math.max(baseline, candidate);
+              }
+              bestDisplay = Math.max(bestDisplay, value);
+              const weekTotal = dailyValues.slice(Math.max(0, day - 6), day + 1).reduce((sum, value) => sum + (value || 0), 0);
+              bestWeek = Math.max(bestWeek, weekTotal);
+              history.push({ date, value, baseline });
           }
-          if (vals.length < 2) return null;
-          const mean = vals.reduce((sum, value) => sum + value, 0) / vals.length;
-          if (mean === 0) return null;
-          const monthlyChange = linRegSlope(vals) * 30;
-          return (monthlyChange / mean) * 100;
+          const eligible = history.slice(BASELINE_MIN_DAYS).slice(-90);
+          const baselines = eligible.map(point => point.baseline);
+          const mean = baselines.reduce((sum, value) => sum + value, 0) / baselines.length;
+          const trend = baselines.length < 2 || !mean ? null : 30 * linRegSlope(baselines) / mean * 100;
+          const values = Object.values(data);
+          return {
+              data, dates, history, endDate, baseline, bestDisplay, bestWeek, trend,
+              current: history.at(-1)?.value ?? 0,
+              total: values.reduce((sum, value) => sum + value, 0),
+              heaviest: values.reduce((best, value) => Math.max(best, value), 0),
+              latest: data[dates.at(-1)],
+              thisWeek: periodTotal(data, endDate),
+              lastWeek: periodTotal(data, addDays(endDate, -7))
+          };
       }
 
-      /* Highest baseline EWMA ever sustained; the green zone anchors here.
-         Ratchets upward only and requires BASELINE_MIN_DAYS of history first. */
-      function bestEwma(data, opts) {
-          const dates = Object.keys(data).sort();
-          if (dates.length === 0) return 0;
-          const today = new Date(todayStr());
-          const span = daysBetween(dates[0], todayStr());
-          if (span < BASELINE_MIN_DAYS) return 0;
-          let best = 0;
-          for (let d = 0; d <= span - BASELINE_MIN_DAYS; d++) {
-              const val = baselineAt(data, addDays(today, -d), opts);
-              if (val > best) best = val;
+      function periodTotal(data, endDate, days = 7) {
+          let total = 0;
+          for (let age = 0; age < days; age++) total += data[isoDate(addDays(endDate, -age))] || 0;
+          return total;
+      }
+
+      function zoneData(analysis, numWeeks, offsetWeeks) {
+          if (!analysis.dates.length) return { curve: [], band: [] };
+          const end = addDays(analysis.endDate, -offsetWeeks * 7);
+          const curve = [];
+          for (let age = numWeeks * 7 - 1; age >= 0; age--) {
+              const date = isoDate(addDays(end, -age));
+              const index = daysBetween(analysis.dates[0], date);
+              const point = analysis.history[index];
+              curve.push(point || { date, value: 0, baseline: 0 });
           }
-          return best;
+          const band = [];
+          for (let week = numWeeks - 1; week >= 0; week--) {
+              const point = curve[curve.length - 1 - week * 7];
+              band.push({ date: point.date, target: point.baseline });
+          }
+          return { curve, band };
       }
 
       function zonePosition(data, opts) {
-          const baseline = bestEwma(data, opts);
+          const { baseline, current } = analyzeSeries(data, opts);
           if (baseline === 0) return { cls: 'zone-grey', label: 'Insufficient data', pct: null };
-          const recent = ewmaWeeklyAt(data, new Date(todayStr()), opts);
-          const ratio = recent / baseline;
+          const ratio = current / baseline;
           const pct = Math.round(ratio * 100);
           if (ratio < 1.00 - 1e-9) return { cls: 'zone-grey',   label: `${pct}% of peak`, pct };
           if (ratio <= ZONE_TOP) return { cls: 'zone-green',  label: `${pct}% of peak, green zone`, pct };
@@ -595,24 +575,6 @@
       }
 
       function progressZone(id) { return zonePosition(volumeSeries(id), VOL_OPTS); }
-
-      function bestWeekEver(data) {
-          const dates = Object.keys(data).sort();
-          if (dates.length === 0) return 0;
-          const today = new Date(todayStr());
-          const span = daysBetween(dates[0], todayStr());
-          let best = 0;
-          for (let offset = 0; offset <= span; offset++) {
-              const end = addDays(today, -offset);
-              let sum = 0;
-              for (let i = 0; i < 7; i++) {
-                  const ds = isoDate(addDays(end, -i));
-                  if (data[ds]) sum += data[ds];
-              }
-              if (sum > best) best = sum;
-          }
-          return best;
-      }
 
       /* ====== EXPORT / IMPORT ====== */
       function exportData() {
@@ -884,6 +846,7 @@
 
           function persist(dateStr) {
               writeEntry(id, dateStr, ex, entry);
+              analyses.clear();
               renderSteppers();
               showSaved();
               redrawAll();
@@ -904,76 +867,66 @@
 
           $day.addEventListener('change', () => { loadEntry($day.value); redrawAll(); });
 
-          /* ---------- stats ---------- */
-          function volumeStats() {
-              const data = volumeSeries(id);
-              const sortedDates = Object.keys(data).sort();
-              const total = Object.values(data).reduce((s, v) => s + v, 0);
-              const startDate = sortedDates.length > 0 ? sortedDates[0] : null;
-
-              const thisWeek = getWeekTotal(id, 0);
-              const lastWeek = getWeekTotal(id, 1);
-              const arrow = trendArrow(thisWeek, lastWeek);
-              const ewma = ewmaWeeklyAt(data, new Date(todayStr()), VOL_OPTS);
-              const ewmaBest = bestDisplayEwma(data, VOL_OPTS);
-              const bestWk = bestWeekEver(data);
-              const zoneBase = bestEwma(data, VOL_OPTS);
-              const zonePct = zoneBase > 0 ? Math.round((ewma / zoneBase) * 100) : null;
-              const zoneLow = Math.floor(zoneBase);
-              const zoneHigh = Math.ceil(zoneBase * ZONE_TOP);
-              const greenTrend = greenZoneTrendPercentPerMonth(data, 90, VOL_OPTS);
-              const trendSign = greenTrend !== null && greenTrend > 0.05 ? '+' : '±';
-              const trendVal = greenTrend === null ? '—' : Math.abs(greenTrend) < 0.05 ? '0' : formatAvg(greenTrend);
-              const trendDisplay = greenTrend === null ? trendVal : `${trendSign}${trendVal}%`;
-
-              return [
-                  statTile(zonePct !== null ? zonePct + '%' : '—', 'Zone position', 'zone-volume'),
-                  statTile(`${arrow} ${thisWeek}`, `Wk vol (prev ${lastWeek})`, 'week-volume'),
-                  statTile(formatAvg(ewma), 'EWMA/wk', 'ewma-volume'),
-                  statTile(trendDisplay, 'Green trend/mo', 'trend-volume'),
-                  statTile(zoneBase > 0 ? zoneLow + '–' + zoneHigh : '—', 'Green zone/wk', 'green-volume'),
-                  statTile(formatAvg(ewmaBest), 'EWMA/wk best', 'ewma-best-volume'),
-                  statTile(bestWk, 'Best wk', 'best-week'),
-                  statTile(total, `All-time ${ex.unit}`, 'all-time'),
-                  statTile(sortedDates.length, 'Days recorded', 'days-recorded'),
-                  statTile(daysSince(startDate), 'Days since first', 'since-volume')
-              ].join('');
+          // Reuse analysis while panning or switching tabs; invalidate after edits.
+          const analyses = new Map();
+          function getAnalysis(metricKey) {
+              const cached = analyses.get(metricKey);
+              if (!cached || cached.endDate !== todayStr()) {
+                  const weight = metricKey === 'weight';
+                  const data = weight ? weightSeries(id) : volumeSeries(id);
+                  analyses.set(metricKey, analyzeSeries(data, weight ? WT_OPTS : VOL_OPTS));
+              }
+              return analyses.get(metricKey);
           }
 
-          function weightStats() {
-              const data = weightSeries(id);
-              const dates = Object.keys(data).sort();
+          /* ---------- stats ---------- */
+          function metricStats(metric) {
+              const isWeight = metric === 'weight';
+              const summary = getAnalysis(metric);
               const u = WEIGHT_UNIT;
-              if (dates.length === 0) {
+              if (isWeight && summary.dates.length === 0) {
                   return statTile('—', 'Zone position', 'zone-weight') + statTile('—', `Level ${u}`, 'weight-level') +
                       `<div class="stat" style="grid-column:1/-1"><div class="stat-label">No performed sessions yet. Complete one to start the weight chart—even at 0 kg.</div></div>`;
               }
-              const ewma = ewmaWeeklyAt(data, new Date(todayStr()), WT_OPTS);
-              const ewmaBest = bestDisplayEwma(data, WT_OPTS);
-              const base = bestEwma(data, WT_OPTS);
-              const pct = base > 0 ? Math.round((ewma / base) * 100) : null;
-              const greenTrend = greenZoneTrendPercentPerMonth(data, 90, WT_OPTS);
-              const trendSign = greenTrend !== null && greenTrend > 0.05 ? '+' : '±';
-              const trendVal = greenTrend === null ? '—' : Math.abs(greenTrend) < 0.05 ? '0' : formatAvg(greenTrend);
-              const trendDisplay = greenTrend === null ? trendVal : `${trendSign}${trendVal}%`;
-              const heaviest = Math.max(...Object.values(data));
-              const latest = data[dates[dates.length - 1]];
 
-              return [
-                  statTile(pct !== null ? pct + '%' : '—', 'Zone position', 'zone-weight'),
-                  statTile(formatAvg(ewma), `Level ${u}`, 'weight-level'),
-                  statTile(base > 0 ? formatAvg(base) + '–' + formatAvg(base * ZONE_TOP) : '—', `Green zone ${u}`, 'green-weight'),
-                  statTile(trendDisplay, 'Green trend/mo', 'trend-weight'),
-                  statTile(formatAvg(ewmaBest), `EWMA best ${u}`, 'ewma-best-weight'),
-                  statTile(formatAvg(heaviest), `Heaviest ${u}`, 'heaviest-weight'),
-                  statTile(formatAvg(latest), `Latest ${u}`, 'latest-weight'),
-                  statTile(dates.length, 'Weight sessions', 'days-weighted'),
-                  statTile(daysSince(dates[0]), 'Days since first', 'since-weight')
-              ].join('');
+              const base = summary.baseline;
+              const zonePosition = base > 0 ? Math.round(summary.current / base * 100) + '%' : '—';
+              const trendSign = summary.trend !== null && summary.trend > 0.05 ? '+' : '±';
+              const trendValue = summary.trend === null ? '—' : Math.abs(summary.trend) < 0.05 ? '0' : formatAvg(summary.trend);
+              const trendDisplay = summary.trend === null ? trendValue : `${trendSign}${trendValue}%`;
+              const zoneRange = base <= 0 ? '—' : isWeight
+                  ? `${formatAvg(base)}–${formatAvg(base * ZONE_TOP)}`
+                  : `${Math.floor(base)}–${Math.ceil(base * ZONE_TOP)}`;
+              const sinceFirst = daysSince(summary.dates[0]);
+
+              // Each metric defines its values, labels and explanation keys in display order.
+              const definitions = isWeight ? [
+                  [zonePosition, 'Zone position', 'zone-weight'],
+                  [formatAvg(summary.current), `Level ${u}`, 'weight-level'],
+                  [zoneRange, `Green zone ${u}`, 'green-weight'],
+                  [trendDisplay, 'Green trend/mo', 'trend-weight'],
+                  [formatAvg(summary.bestDisplay), `EWMA best ${u}`, 'ewma-best-weight'],
+                  [formatAvg(summary.heaviest), `Heaviest ${u}`, 'heaviest-weight'],
+                  [formatAvg(summary.latest), `Latest ${u}`, 'latest-weight'],
+                  [summary.dates.length, 'Weight sessions', 'days-weighted'],
+                  [sinceFirst, 'Days since first', 'since-weight']
+              ] : [
+                  [zonePosition, 'Zone position', 'zone-volume'],
+                  [`${trendArrow(summary.thisWeek, summary.lastWeek)} ${summary.thisWeek}`, `Wk vol (prev ${summary.lastWeek})`, 'week-volume'],
+                  [formatAvg(summary.current), 'EWMA/wk', 'ewma-volume'],
+                  [trendDisplay, 'Green trend/mo', 'trend-volume'],
+                  [zoneRange, 'Green zone/wk', 'green-volume'],
+                  [formatAvg(summary.bestDisplay), 'EWMA/wk best', 'ewma-best-volume'],
+                  [summary.bestWeek, 'Best wk', 'best-week'],
+                  [summary.total, `All-time ${ex.unit}`, 'all-time'],
+                  [summary.dates.length, 'Days recorded', 'days-recorded'],
+                  [sinceFirst, 'Days since first', 'since-volume']
+              ];
+              return definitions.map(([value, label, infoKey]) => statTile(value, label, infoKey)).join('');
           }
 
           function updateStats() {
-              $stats.innerHTML = view === 'weight' ? weightStats() : volumeStats();
+              $stats.innerHTML = metricStats(view === 'weight' ? 'weight' : 'volume');
           }
 
           /* ---------- charts ---------- */
@@ -983,7 +936,7 @@
           // Volume uses the smoothed green-zone chart. Weight uses raw session
           // bars below so changes in actual training load remain easy to read.
           const METRICS = {
-              volume: { series: () => volumeSeries(id), opts: VOL_OPTS, label: 'Volume EWMA/wk', unit: `${ex.unit}/wk` }
+              volume: { label: 'Volume EWMA/wk', unit: `${ex.unit}/wk` }
           };
 
           function prepCanvas() {
@@ -995,6 +948,31 @@
               ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
               ctx.clearRect(0, 0, cssW, cssH);
               return { ctx, cssW, cssH };
+          }
+
+          function chartGeometry(cssW, cssH, maxV, leftPadding = 40) {
+              const pad = { l: leftPadding, r: 8, t: 8, b: 24 };
+              const w = cssW - pad.l - pad.r;
+              const h = cssH - pad.t - pad.b;
+              const toY = value => pad.t + h - (value / maxV) * h;
+              return { pad, w, h, toY };
+          }
+
+          function drawChartAxes(ctx, { pad, w, h }, topLabel) {
+              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(pad.l, pad.t);
+              ctx.lineTo(pad.l, pad.t + h);
+              ctx.lineTo(pad.l + w, pad.t + h);
+              ctx.stroke();
+
+              ctx.fillStyle = 'rgba(255,255,255,0.45)';
+              ctx.font = '11px -apple-system, system-ui, Arial';
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('0', pad.l - 6, pad.t + h);
+              ctx.fillText(topLabel, pad.l - 6, pad.t);
           }
 
           // --- daily bars (volume), split into one segment per set ---
@@ -1037,28 +1015,14 @@
               const { dates, labels, counts, setsArr, startISO, endISO: eISO } = getHistoryWindow(endISO, WINDOW_DAYS);
               const { ctx, cssW, cssH } = prepCanvas();
 
-              const pad = { l: 32, r: 8, t: 8, b: 24 };
-              const w = cssW - pad.l - pad.r;
-              const h = cssH - pad.t - pad.b;
               const maxV = Math.max(5, ...counts);
+              const plot = chartGeometry(cssW, cssH, maxV, 32);
+              const { pad, w, h, toY } = plot;
               const barGap = 6;
               const barW = Math.max(4, (w - barGap * (counts.length - 1)) / counts.length);
               pxPerDay = w / WINDOW_DAYS;
 
-              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(pad.l, pad.t);
-              ctx.lineTo(pad.l, pad.t + h);
-              ctx.lineTo(pad.l + w, pad.t + h);
-              ctx.stroke();
-
-              ctx.fillStyle = 'rgba(255,255,255,0.45)';
-              ctx.font = '11px -apple-system, system-ui, Arial';
-              ctx.textAlign = 'right';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('0', pad.l - 6, pad.t + h);
-              ctx.fillText(String(maxV), pad.l - 6, pad.t);
+              drawChartAxes(ctx, plot, String(maxV));
 
               const startX = pad.l;
               activeChartPoints = dates.map((date, i) => ({
@@ -1072,7 +1036,7 @@
                   if (v <= 0) continue;
                   const x = startX + i * (barW + barGap);
                   const bh = (v / maxV) * h;
-                  const y = pad.t + h - bh;
+                  const y = toY(v);
                   const r = Math.min(3, barW / 2);
 
                   ctx.fillStyle = barColor;
@@ -1154,48 +1118,6 @@
               }
           }
 
-          function zoneData(data, opts, numWeeks, offsetWeeks) {
-              const dates = Object.keys(data).sort();
-              if (dates.length === 0) return { curve: [], band: [] };
-
-              const firstDate = new Date(dates[0]);
-              const today = new Date(todayStr());
-              const endRef = addDays(today, -offsetWeeks * 7);
-              const numDays = numWeeks * 7;
-              const windowStart = addDays(endRef, -(numDays - 1));
-
-              // Running best baseline EWMA accumulated up to the visible window.
-              const firstEligible = addDays(firstDate, BASELINE_MIN_DAYS);
-              let runningBest = 0;
-              const preDays = Math.max(0, daysBetween(isoDate(firstEligible), isoDate(windowStart)));
-              for (let d = 0; d <= preDays; d++) {
-                  const end = addDays(firstEligible, d);
-                  if (end > windowStart) break;
-                  const val = baselineAt(data, end, opts);
-                  if (val > runningBest) runningBest = val;
-              }
-
-              const curve = [];
-              for (let i = numDays - 1; i >= 0; i--) {
-                  const end = addDays(endRef, -i);
-                  curve.push({ date: isoDate(end), value: ewmaWeeklyAt(data, end, opts) });
-              }
-
-              const band = [];
-              for (let i = numWeeks - 1; i >= 0; i--) {
-                  const end = addDays(endRef, -i * 7);
-                  const daysSinceFirst = daysBetween(isoDate(firstDate), isoDate(end));
-                  let target = 0;
-                  if (daysSinceFirst >= BASELINE_MIN_DAYS) {
-                      const val = baselineAt(data, end, opts);
-                      if (val > runningBest) runningBest = val;
-                      target = runningBest;
-                  }
-                  band.push({ date: isoDate(end), target });
-              }
-              return { curve, band };
-          }
-
           function computeZoneBounds(data) {
               const dates = Object.keys(data).sort();
               if (dates.length === 0) { maxZoneOffset = 0; return; }
@@ -1208,9 +1130,9 @@
 
           function drawZone(metricKey) {
               const m = METRICS[metricKey];
-              const data = m.series();
-              computeZoneBounds(data);
-              const { curve, band } = zoneData(data, m.opts, ZONE_WEEKS, zoneOffsetWeeks);
+              const analysis = getAnalysis(metricKey);
+              computeZoneBounds(analysis.data);
+              const { curve, band } = zoneData(analysis, ZONE_WEEKS, zoneOffsetWeeks);
               const { ctx, cssW, cssH } = prepCanvas();
 
               if (curve.length === 0) {
@@ -1219,17 +1141,14 @@
                   return;
               }
 
-              const pad = { l: 40, r: 8, t: 8, b: 24 };
-              const w = cssW - pad.l - pad.r;
-              const h = cssH - pad.t - pad.b;
               const nd = curve.length;
               const nb = band.length;
 
               const allVals = curve.map(p => p.value)
                   .concat(band.flatMap(p => [p.target * ZONE_TOP, p.target]));
               const maxV = Math.max(5, ...allVals) * 1.1;
-
-              const toY = v => pad.t + h - (v / maxV) * h;
+              const plot = chartGeometry(cssW, cssH, maxV);
+              const { pad, w, h, toY } = plot;
               const curveX = i => pad.l + (i / (nd - 1)) * w;
               const bandX = i => pad.l + (i / (nb - 1)) * w;
               pxPerWeek = w / (nb - 1);
@@ -1264,20 +1183,7 @@
                   ctx.setLineDash([]);
               }
 
-              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(pad.l, pad.t);
-              ctx.lineTo(pad.l, pad.t + h);
-              ctx.lineTo(pad.l + w, pad.t + h);
-              ctx.stroke();
-
-              ctx.fillStyle = 'rgba(255,255,255,0.45)';
-              ctx.font = '11px -apple-system, system-ui, Arial';
-              ctx.textAlign = 'right';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('0', pad.l - 6, pad.t + h);
-              ctx.fillText(String(Math.round(maxV)), pad.l - 6, pad.t);
+              drawChartAxes(ctx, plot, String(Math.round(maxV)));
 
               ctx.strokeStyle = barColor;
               ctx.lineWidth = 2;
@@ -1335,28 +1241,13 @@
               const calendar = [];
               for (let i = 0; i < ZONE_WEEKS * 7; i++) calendar.push({ date: isoDate(addDays(start, i)) });
 
-              const pad = { l: 40, r: 8, t: 8, b: 24 };
-              const w = cssW - pad.l - pad.r;
-              const h = cssH - pad.t - pad.b;
               const maxV = Math.max(5, ...sessions.map(point => point.value)) * 1.1;
+              const plot = chartGeometry(cssW, cssH, maxV);
+              const { pad, w, h, toY } = plot;
               const xForDate = date => pad.l + (daysBetween(startISO, date) / (ZONE_WEEKS * 7 - 1)) * w;
-              const toY = value => pad.t + h - (value / maxV) * h;
               pxPerWeek = w / (ZONE_WEEKS - 1);
 
-              ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.moveTo(pad.l, pad.t);
-              ctx.lineTo(pad.l, pad.t + h);
-              ctx.lineTo(pad.l + w, pad.t + h);
-              ctx.stroke();
-
-              ctx.fillStyle = 'rgba(255,255,255,0.45)';
-              ctx.font = '11px -apple-system, system-ui, Arial';
-              ctx.textAlign = 'right';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('0', pad.l - 6, pad.t + h);
-              ctx.fillText(formatAvg(maxV), pad.l - 6, pad.t);
+              drawChartAxes(ctx, plot, formatAvg(maxV));
 
               const barW = Math.max(3, Math.min(8, w / (ZONE_WEEKS * 4)));
               activeChartPoints = sessions.map(point => ({
@@ -1519,18 +1410,26 @@
                   if (e.key === 'ArrowRight') { zoneOffsetWeeks = clamp(zoneOffsetWeeks - 1, 0, maxZoneOffset); drawActiveChart(); }
               }
           };
-          document.addEventListener('keydown', onKey);
+          const viewEvents = new AbortController();
+          document.addEventListener('keydown', onKey, { signal: viewEvents.signal });
+          addEventListener('storage', (event) => {
+              if (event.key !== null && !event.key.startsWith(`ex:${id}:`)) return;
+              analyses.clear();
+              loadEntry($day.value);
+              redrawAll();
+          }, { signal: viewEvents.signal });
 
           // init
           loadEntry($day.value);
           computeBounds();
           drawActiveChart();
           updateStats();
-          addEventListener('resize', drawActiveChart, {passive:true});
+          addEventListener('resize', drawActiveChart, { passive: true, signal: viewEvents.signal });
 
           (function showSavedInit(){ $status.textContent='Saved'; $status.style.opacity='.5'; })();
 
           setupSwipe(document.querySelector('.card'));
+          return () => viewEvents.abort();
       }
 
       /* ---------- DASHBOARD ---------- */
@@ -1609,10 +1508,13 @@
       }
 
       /* ---------- ROUTER ---------- */
+      let disposeView = null;
       function route() {
+          disposeView?.();
+          disposeView = null;
           const id = location.hash.replace(/^#/, '');
           if (id === 'dashboard') renderDashboard();
-          else if (id) renderDetail(id);
+          else if (id) disposeView = renderDetail(id);
           else renderHome();
       }
       addEventListener('hashchange', route, {passive:true});
